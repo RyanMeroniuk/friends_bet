@@ -30,7 +30,7 @@ public class User {
 
     // Timestamp when the user was created.
     @Column (nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private final Instant createdAt = Instant.now();
 
     // JPA (Hibernate) needs a constructor with no arguments.
     public User() {}
