@@ -2,7 +2,7 @@ package com.ryanmeroniuk.friends_bet.dto;
 
 public class LoginRequest {
 
-    private String username;
+    private String usernameOrEmail;
     private String password;
 
     public LoginRequest(){}
@@ -15,11 +15,11 @@ public class LoginRequest {
         this.password = password;
     }
 
-    public String getUsername() {
-        return username;
+    public String getUsernameOrEmail() {
+        return usernameOrEmail;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setUsernameOrEmail(String username) {
+        this.usernameOrEmail = username;
     }
 }

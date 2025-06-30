@@ -26,7 +26,7 @@ public class User {
 
     // User's password.
     @Column(nullable = false)
-    private String password;
+    private String passwordHash;
 
     // Timestamp when the user was created.
     @Column (nullable = false, updatable = false)
@@ -36,10 +36,10 @@ public class User {
     public User() {}
 
     // Constructor for creating a new user.
-    public User(String username, String email, String password){
+    public User(String username, String email, String passwordHash){
         this.username = username;
         this.email = email;
-        this.password = password;
+        this.passwordHash = passwordHash;
     }
 
     // Getter for user id.
@@ -58,8 +58,8 @@ public class User {
     }
 
     // Getter for user's password.
-    public String getPassword() {
-        return password;
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
     // Getter for time user was created at.
@@ -83,7 +83,7 @@ public class User {
     }
 
     // Setter for user's password.
-    public void setPassword(String password) {
-        this.password = password;
+    public void setPasswordHash(String password) {
+        this.passwordHash = password;
     }
 }

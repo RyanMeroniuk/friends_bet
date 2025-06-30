@@ -1,0 +1,10 @@
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/FriendsBetApplication.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/config/SecurityConfig.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/controller/PingController.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/controller/UserController.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/dto/AuthResponse.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/dto/CreateUserRequest.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/dto/LoginRequest.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/model/User.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/repository/UserRepository.java
+/Users/ryanmeroniuk/friends_bet/src/main/java/com/ryanmeroniuk/friends_bet/service/UserService.java
