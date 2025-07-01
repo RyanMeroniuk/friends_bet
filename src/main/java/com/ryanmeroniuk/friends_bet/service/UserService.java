@@ -5,6 +5,7 @@ import com.ryanmeroniuk.friends_bet.dto.CreateUserRequest;
 import com.ryanmeroniuk.friends_bet.dto.LoginRequest;
 import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import com.ryanmeroniuk.friends_bet.util.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,10 +15,12 @@ import java.util.UUID;
 public class UserService {
     private final UserRepository userRepo;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public UserService(UserRepository userRepo, PasswordEncoder passwordEncoder){
+    public UserService(UserRepository userRepo, PasswordEncoder passwordEncoder, JwtUtil jwtUtil){
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
 
     }
 
@@ -39,8 +42,8 @@ public class UserService {
         User user = new User(req.getUsername(), req.getEmail(), hashed);
         User saved = userRepo.save(user);
 
-        // Generate a simple token
-        String token = UUID.randomUUID().toString();
+        // Generate a jwt token
+        String token = jwtUtil.generateToken(saved.getUsername());
 
         return new AuthResponse(
                 saved.getId(),
@@ -73,7 +76,7 @@ public class UserService {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        String token = UUID.randomUUID().toString();
+        String token = jwtUtil.generateToken(user.getUsername());
 
         return new AuthResponse(
                 user.getId(),
