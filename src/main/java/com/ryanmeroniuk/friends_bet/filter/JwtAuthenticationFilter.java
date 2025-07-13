@@ -1,6 +1,6 @@
 package com.ryanmeroniuk.friends_bet.filter;
 
-import com.ryanmeroniuk.friends_bet.service.CustomUserDetailsService;
+import com.ryanmeroniuk.friends_bet.service.UserDetailsService;
 import com.ryanmeroniuk.friends_bet.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,10 +16,10 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
-    private final CustomUserDetailsService userDetailsService;
+    private final UserDetailsService userDetailsService;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
-                                   CustomUserDetailsService uds) {
+                                   UserDetailsService uds) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = uds;
     }
