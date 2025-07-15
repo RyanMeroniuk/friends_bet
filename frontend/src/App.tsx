@@ -1,27 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { ping } from './api/ping';
-import { Container, Typography, CircularProgress } from '@mui/material';
+import React from 'react';
+import { registerUser } from './api/user';
 
 function App() {
-  const [pong, setPong] = useState<string | null>(null);
-
-  useEffect(() => {
-    ping()
-      .then((data) => setPong(data))
-      .catch((err) => setPong('Error'));
-  }, []);
+  const onTestRegister = async () => {
+    try {
+      const resp = await registerUser({
+        username: 'test1',
+        email: 'test1@example.com',
+        password: 'Password123'
+      });
+      console.log('Register response:', resp);
+      alert(`Registered: ${resp.username} (${resp.email})\nToken: ${resp.token}`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Error: ' + (err.response?.data || err.message));
+    }
+  };
 
   return (
-    <Container style={{ marginTop: 40, textAlign: 'center' }}>
-      <Typography variant="h4" gutterBottom>
-        FriendsBet Front-End
-      </Typography>
-      {pong === null ? (
-        <CircularProgress />
-      ) : (
-        <Typography variant="h6">Backend says: {pong}</Typography>
-      )}
-    </Container>
+    <div style={{ padding: 20 }}>
+      <h1>FriendsBet Front-End</h1>
+      <button onClick={onTestRegister}>Test User Registration</button>
+    </div>
   );
 }
 
