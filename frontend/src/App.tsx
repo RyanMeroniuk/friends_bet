@@ -1,27 +1,28 @@
 import React from 'react';
-import { registerUser } from './api/user';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { AppBar, Toolbar, Button, Container } from '@mui/material';
+
+import AuthPage from './pages/AuthPage';
 
 function App() {
-  const onTestRegister = async () => {
-    try {
-      const resp = await registerUser({
-        username: 'test1',
-        email: 'test1@example.com',
-        password: 'Password123'
-      });
-      console.log('Register response:', resp);
-      alert(`Registered: ${resp.username} (${resp.email})\nToken: ${resp.token}`);
-    } catch (err: any) {
-      console.error(err);
-      alert('Error: ' + (err.response?.data || err.message));
-    }
-  };
-
   return (
-    <div style={{ padding: 20 }}>
-      <h1>FriendsBet Front-End</h1>
-      <button onClick={onTestRegister}>Test User Registration</button>
-    </div>
+    <BrowserRouter>
+      <AppBar position="static">
+        <Toolbar>
+          <Button color="inherit" component={Link} to="/auth">
+            Sign In / Up
+          </Button>
+          <Button color="inherit" component={Link} to="/">
+            Groups
+          </Button>
+        </Toolbar>
+      </AppBar>
+      <Container sx={{ mt: 4 }}>
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
+        </Routes>
+      </Container>
+    </BrowserRouter>
   );
 }
 
