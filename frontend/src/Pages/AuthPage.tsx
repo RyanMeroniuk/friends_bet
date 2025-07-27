@@ -1,37 +1,37 @@
 import React, { useState } from 'react';
-import { registerUser, loginUser } from '../api/user';
-import { AuthResponse, CreateUserRequest, LoginRequest } from '../api/user';
+import { registerUser, loginUser, AuthResponse } from '../api/user';
 
 export default function AuthPage() {
-  // “mode” controls whether we show register or login
   const [mode, setMode] = useState<'register' | 'login'>('register');
-  // Shared state
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage]   = useState<string | null>(null);
+  const [userId, setUserId]     = useState<string | null>(null);
 
   const clearForm = () => {
     setUsername('');
     setEmail('');
     setPassword('');
     setMessage(null);
+    setUserId(null);
   };
 
   const onSubmit = async () => {
     try {
       let resp: AuthResponse;
       if (mode === 'register') {
-        const req: CreateUserRequest = { username, email, password };
-        resp = await registerUser(req);
+        resp = await registerUser({ username, email, password });
       } else {
-        const req: LoginRequest = { usernameOrEmail: username || email, password };
-        resp = await loginUser(req);
+        resp = await loginUser({ usernameOrEmail: username || email, password });
       }
+      // Store token and userId
+      localStorage.setItem('token', resp.token);
+      setUserId(resp.id);
       setMessage(`Success! Welcome, ${resp.username}`);
-      // Optionally store resp.token...
     } catch (err: any) {
       setMessage(err.response?.data || 'Operation failed');
+      setUserId(null);
     }
   };
 
@@ -94,6 +94,12 @@ export default function AuthPage() {
         >
           {message}
         </div>
+      )}
+
+      {userId && (
+        <p style={{ marginTop: '0.5rem' }}>
+          Your User ID is: <strong>{userId}</strong>
+        </p>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './axios';
 
 export interface AuthResponse {
   id: string;
@@ -15,26 +15,22 @@ export interface CreateUserRequest {
 }
 
 export interface LoginRequest {
-    usernameOrEmail: string;
-    password: string;
+  usernameOrEmail: string;
+  password: string;
 }
 
 /**
- * Sends a user registration request to the backend.
- * @param req { username, email, password }
- * @returns the AuthResponse containing user info and a token
+ * POST /api/users/register
  */
 export async function registerUser(req: CreateUserRequest): Promise<AuthResponse> {
-  const response = await axios.post<AuthResponse>('/api/users/register', req);
-  return response.data;
+  const resp = await api.post<AuthResponse>('/api/users/register', req);
+  return resp.data;
 }
 
 /**
- * Sends a user login request to the backend.
- * @param req { usernameOrEmail, password }
- * @returns the AuthResponse containing user info and a token
+ * POST /api/users/login
  */
 export async function loginUser(req: LoginRequest): Promise<AuthResponse> {
-  const response = await axios.post<AuthResponse>('/api/users/login', req);
-  return response.data;
+  const resp = await api.post<AuthResponse>('/api/users/login', req);
+  return resp.data;
 }
