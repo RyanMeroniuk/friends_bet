@@ -36,7 +36,7 @@ public class BetResponse {
         this.createdAt = createdAt;
         this.resolvedAt = resolvedAt;
     }
-    
+
     public UUID getId() { return id; }
     public UUID getGroupId() { return groupId; }
     public UUID getProposerId() { return proposerId; }
