@@ -9,7 +9,7 @@ export interface WalletResponse {
  * GET /api/groups/{groupId}/wallets
  */
 export async function listBalances(groupId: string): Promise<WalletResponse[]> {
-  const resp = await axios.get<WalletResponse[]>(`/api/groups/${groupId}/wallets`);
+  const resp = await api.get<WalletResponse[]>(`/api/groups/${groupId}/wallets`);
   return resp.data;
 }
 
@@ -21,7 +21,7 @@ export async function deposit(
   userId: string,
   amountCents: number
 ): Promise<WalletResponse> {
-  const resp = await axios.post<WalletResponse>(
+  const resp = await api.post<WalletResponse>(
     `/api/groups/${groupId}/wallets/deposit`,
     { userId, amountCents }
   );
