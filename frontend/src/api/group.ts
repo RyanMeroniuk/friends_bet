@@ -1,4 +1,3 @@
-// frontend/src/api/group.ts
 import api from './axios';
 
 export interface GroupResponse {
