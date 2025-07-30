@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { listGroups, createGroup, joinGroup, GroupResponse } from '../api/group';
+import { useGroup } from '../context/GroupContext';
 
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -7,6 +9,9 @@ export default function GroupPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [joinUserId, setJoinUserId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+
+  const { setGroupId } = useGroup();
+  const navigate = useNavigate();
 
   // Load groups when the page mounts
   useEffect(() => {
@@ -24,25 +29,54 @@ export default function GroupPage() {
 
   async function handleCreate() {
     try {
-      await createGroup(newName);
+      const grp = await createGroup(newName);
       setNewName('');
       setMessage('Group created');
       loadGroups();
+      // automatically navigate into new group
+      setGroupId(grp.id);
+      navigate(`/groups/${grp.id}/bets`);
     } catch (err: any) {
       setMessage(err.response?.data || 'Error creating group');
     }
   }
 
   async function handleJoin() {
+    // 1) Clear any prior message
+    setMessage(null);
+
+    const code = inviteCode.trim();
+    const uId  = joinUserId.trim();
+    console.log('Joining group', code, uId);
+
     try {
-      await joinGroup(inviteCode, joinUserId);
+      // 2) Call the API
+      const grp = await joinGroup(code, uId);
+
+      // 3) Show a success message (or navigate away)
+      setMessage('Successfully joined group!');
+
+      // 4) Clear the form
       setInviteCode('');
       setJoinUserId('');
-      setMessage('Joined group');
-      loadGroups();
+
+      // 5) Refresh your list of groups
+      await loadGroups();
+
+      // (Optional) Immediately enter that group:
+      setGroupId(grp.id);
+      navigate(`/groups/${grp.id}/bets`);
     } catch (err: any) {
+      // 6) On error, show the real message
+      console.error('joinGroup failed response:', err.response);
       setMessage(err.response?.data || 'Error joining group');
     }
+  }
+
+
+  function openGroup(grp: GroupResponse) {
+    setGroupId(grp.id);
+    navigate(`/groups/${grp.id}/bets`);
   }
 
   return (
@@ -75,7 +109,11 @@ export default function GroupPage() {
 
       <ul>
         {groups.map(g => (
-          <li key={g.id}>
+          <li
+            key={g.id}
+            style={{ cursor: 'pointer', marginBottom: '0.5rem' }}
+            onClick={() => openGroup(g)}
+          >
             <strong>{g.name}</strong> (Code: {g.inviteCode})
           </li>
         ))}

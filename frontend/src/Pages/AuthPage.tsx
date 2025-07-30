@@ -27,6 +27,7 @@ export default function AuthPage() {
       }
       // Store token and userId
       localStorage.setItem('token', resp.token);
+      localStorage.setItem('userId', resp.id)
       setUserId(resp.id);
       setMessage(`Success! Welcome, ${resp.username}`);
     } catch (err: any) {

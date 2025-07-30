@@ -2,7 +2,6 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/', // proxy to backend
 });
 
 api.interceptors.request.use(config => {

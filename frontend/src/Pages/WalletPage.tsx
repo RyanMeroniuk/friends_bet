@@ -33,13 +33,19 @@ export default function WalletPage() {
   }
 
   async function onDeposit() {
-    if (!groupId) return;
+    if (!groupId){
+        console.error('onDeposit: no groupId in context');
+        return;
+    }
+
     try {
+        console.log('Depositing', amount, 'cents into group', groupId, 'for user', userId);
       await deposit(groupId, userId, parseInt(amount, 10));
       setMessage('Deposit successful');
       setAmount('');
       loadBalances();
     } catch (e: any) {
+        console.error('Deposit failed:', e.response ?? e);
       setMessage(e.response?.data || 'Deposit failed');
     }
   }
