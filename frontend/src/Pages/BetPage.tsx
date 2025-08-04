@@ -1,8 +1,5 @@
-// frontend/src/pages/BetPage.tsx
-
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useGroup } from '../context/GroupContext';
+import { listGroups } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import {
   Box,
@@ -11,13 +8,17 @@ import {
   Button,
   List,
   ListItem,
-  Divider
+  Divider,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
 } from '@mui/material';
 
 export default function BetPage() {
-  const { groupId } = useGroup();
-  const navigate    = useNavigate();
-
+  // Load all groups for the dropdown
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [bets, setBets]       = useState<Bet[]>([]);
   const [userId, setUserId]   = useState<string>('');
   const [gameId, setGameId]   = useState<string>('');
@@ -27,23 +28,25 @@ export default function BetPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
 
+  // 1) Load groups on mount
   useEffect(() => {
-    // if no group selected, redirect back to groups list
-    if (!groupId) {
-      navigate('/dashboard/groups');
-      return;
-    }
+    listGroups()
+      .then(gs => setGroups(gs.map(g => ({ id: g.id, name: g.name }))))
+      .catch(e => setError('Could not load groups'));
+  }, []);
+
+  // 2) When selectedGroup changes, load its bets
+  useEffect(() => {
+    if (!selectedGroup) return;
     loadBets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [selectedGroup]);
 
   async function loadBets() {
     try {
       setError(null);
-      const data = await listBets(groupId!);
+      const data = await listBets(selectedGroup);
       setBets(data);
     } catch (e: any) {
-      console.error('Failed to load bets', e);
       setError(e.response?.data || 'Could not load bets');
     }
   }
@@ -51,12 +54,11 @@ export default function BetPage() {
   async function onPropose() {
     setMessage(null);
     try {
-      await proposeBet(groupId!, userId, gameId, 'win', pick, amount, odds);
+      await proposeBet(selectedGroup, userId, gameId, 'win', pick, amount, odds);
       setMessage('Bet proposed!');
       loadBets();
     } catch (e: any) {
-      console.error('Propose bet failed', e);
-      setMessage(e.response?.data || 'Error proposing bet');
+      setError(e.response?.data || 'Error proposing bet');
     }
   }
 
@@ -67,106 +69,133 @@ export default function BetPage() {
       setMessage('Bet accepted!');
       loadBets();
     } catch (e: any) {
-      console.error('Accept bet failed', e);
-      setMessage(e.response?.data || 'Error accepting bet');
+      setError(e.response?.data || 'Error accepting bet');
     }
   }
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
       <Typography variant="h4" gutterBottom>
-        Bets for Group {groupId}
+        Bets
       </Typography>
 
-      {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-      )}
-      {message && (
-        <Typography color="secondary" sx={{ mb: 2 }}>
-          {message}
-        </Typography>
-      )}
+      {/* Group selector */}
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel id="group-select-label">Select Group</InputLabel>
+        <Select
+          labelId="group-select-label"
+          value={selectedGroup}
+          label="Select Group"
+          onChange={e => setSelectedGroup(e.target.value)}
+        >
+          {groups.map(g => (
+            <MenuItem key={g.id} value={g.id}>
+              {g.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
 
-      <List>
-        {bets.map(b => (
-          <ListItem
-            key={b.id}
-            sx={{ flexDirection: 'column', alignItems: 'flex-start' }}
-          >
-            <Typography>
-              <strong>{b.pick}</strong> @ {b.odds} — $
-              {(b.amountCents / 100).toFixed(2)} — Status: {b.status}
+      {!selectedGroup ? (
+        <Typography>Select a group to view or create bets.</Typography>
+      ) : (
+        <>
+          {error && (
+            <Typography color="error" sx={{ mb: 2 }}>
+              {error}
             </Typography>
-            {b.status === 'OPEN' && (
-              <Button
-                size="small"
-                onClick={() => onAccept(b.id)}
-                sx={{ mt: 1 }}
+          )}
+          {message && (
+            <Typography color="secondary" sx={{ mb: 2 }}>
+              {message}
+            </Typography>
+          )}
+
+          {/* List existing bets */}
+          <List>
+            {bets.map(b => (
+              <ListItem
+                key={b.id}
+                sx={{ flexDirection: 'column', alignItems: 'flex-start' }}
               >
-                Accept
-              </Button>
-            )}
-          </ListItem>
-        ))}
-      </List>
+                <Typography>
+                  <strong>{b.pick}</strong> @ {b.odds} — $
+                  {(b.amountCents / 100).toFixed(2)} — Status: {b.status}
+                </Typography>
+                {b.status === 'OPEN' && (
+                  <Button
+                    size="small"
+                    onClick={() => onAccept(b.id)}
+                    sx={{ mt: 1 }}
+                  >
+                    Accept
+                  </Button>
+                )}
+              </ListItem>
+            ))}
+          </List>
 
-      <Divider sx={{ my: 3 }} />
+          <Divider sx={{ my: 3 }} />
 
-      <Typography variant="h6" gutterBottom>
-        Propose a New Bet
-      </Typography>
-
-      <Box
-        component="form"
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-          gap: 2,
-        }}
-        onSubmit={e => {
-          e.preventDefault();
-          onPropose();
-        }}
-      >
-        <TextField
-          label="Your User ID"
-          value={userId}
-          onChange={e => setUserId(e.target.value)}
-          required
-        />
-        <TextField
-          label="Game ID"
-          value={gameId}
-          onChange={e => setGameId(e.target.value)}
-          required
-        />
-        <TextField
-          label="Pick (home/away)"
-          value={pick}
-          onChange={e => setPick(e.target.value)}
-          required
-        />
-        <TextField
-          label="Odds"
-          type="number"
-          value={odds}
-          onChange={e => setOdds(+e.target.value)}
-          inputProps={{ step: '0.01' }}
-          required
-        />
-        <TextField
-          label="Amount (cents)"
-          type="number"
-          value={amount}
-          onChange={e => setAmount(+e.target.value)}
-          required
-        />
-        <Button type="submit" variant="contained" sx={{ gridColumn: 'span 2' }}>
-          Propose Bet
-        </Button>
-      </Box>
+          {/* Propose a new bet */}
+          <Typography variant="h6" gutterBottom>
+            Propose a New Bet
+          </Typography>
+          <Box
+            component="form"
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: 2,
+            }}
+            onSubmit={e => {
+              e.preventDefault();
+              onPropose();
+            }}
+          >
+            <TextField
+              label="Your User ID"
+              value={userId}
+              onChange={e => setUserId(e.target.value)}
+              required
+            />
+            <TextField
+              label="Game ID"
+              value={gameId}
+              onChange={e => setGameId(e.target.value)}
+              required
+            />
+            <TextField
+              label="Pick (home/away)"
+              value={pick}
+              onChange={e => setPick(e.target.value)}
+              required
+            />
+            <TextField
+              label="Odds"
+              type="number"
+              value={odds}
+              onChange={e => setOdds(+e.target.value)}
+              inputProps={{ step: '0.01' }}
+              required
+            />
+            <TextField
+              label="Amount (cents)"
+              type="number"
+              value={amount}
+              onChange={e => setAmount(+e.target.value)}
+              required
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              sx={{ gridColumn: 'span 2' }}
+            >
+              Propose Bet
+            </Button>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
