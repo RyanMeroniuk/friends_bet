@@ -22,8 +22,10 @@ public class Bet {
     @JoinColumn(name = "acceptor_id")
     private User acceptor;
 
-    @Column(nullable = false)
-    private String gameId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game;
+
 
     @Column(nullable = false)
     private String marketType;
@@ -50,12 +52,12 @@ public class Bet {
     public Bet() {}
 
 
-    public Bet(Group group, User proposer, String gameId,
+    public Bet(Group group, User proposer, Game game,
                String marketType, String pick,
                long amountCents, double odds) {
         this.group = group;
         this.proposer = proposer;
-        this.gameId = gameId;
+        this.game = game;
         this.marketType = marketType;
         this.pick = pick;
         this.amountCents = amountCents;
@@ -95,12 +97,12 @@ public class Bet {
         this.acceptor = acceptor;
     }
 
-    public String getGameId() {
-        return gameId;
+    public Game getGame() {
+        return game;
     }
 
-    public void setGameId(String gameId) {
-        this.gameId = gameId;
+    public void setGame(Game game) {
+        this.game = game;
     }
 
     public String getMarketType() {
