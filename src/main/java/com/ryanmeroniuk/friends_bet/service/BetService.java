@@ -115,4 +115,49 @@ public class BetService {
                 bet.getResolvedAt()
         );
     }
+
+    /**
+     * Every minute: find all ACCEPTED bets whose game.startTime is in the past,
+     * determine a winner, and transfer funds accordingly.
+     */
+    @Scheduled(fixedRate = 60_000)
+    @Transactional
+    public void settleBets() {
+        Instant now = Instant.now();
+
+        // 1) Fetch all accepted bets
+        List<Bet> toSettle = betRepo.findAll().stream()
+                .filter(b -> "ACCEPTED".equals(b.getStatus()))
+                .filter(b -> b.getGame().getStartTime().isBefore(now))
+                .collect(Collectors.toList());
+
+        for (Bet bet : toSettle) {
+            // 2) Determine winner (stub—replace with real result lookup)
+            UUID winnerId = determineWinner(bet);
+
+            // 3) Calculate payout: stake * odds
+            long payoutCents = Math.round(bet.getAmountCents() * bet.getOdds());
+
+            // 4) Transfer funds: credit winner
+            walletService.deposit(
+                    bet.getGroup().getId(),
+                    new WalletDepositRequest(winnerId, payoutCents)
+            );
+
+            // 5) Mark bet as resolved
+            bet.setStatus("RESOLVED");
+            bet.setResolvedAt(now);
+            betRepo.save(bet);
+        }
+    }
+
+    /**
+     * Stub for determining winner—swap in real result checking.
+     */
+    private UUID determineWinner(Bet bet) {
+        // For now, random:
+        return Math.random() < 0.5
+                ? bet.getProposer().getId()
+                : bet.getAcceptor().getId();
+    }
 }
