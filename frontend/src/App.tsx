@@ -1,57 +1,38 @@
 // frontend/src/App.tsx
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
-import { AppBar, Toolbar, Button, Container } from '@mui/material';
-import { useGroup } from './context/GroupContext';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import AuthPage from './pages/AuthPage';
-import GroupPage from './pages/GroupPage';
-import BetPage from './pages/BetPage';
+import AuthPage   from './pages/AuthPage';
+import MainPage   from './pages/MainPage';
+import GroupPage  from './pages/GroupPage';
 import WalletPage from './pages/WalletPage';
+import BetPage    from './pages/BetPage';
 
 function App() {
-  const { groupId } = useGroup();
-
   return (
     <BrowserRouter>
-      <AppBar position="static">
-        <Toolbar>
-          <Button color="inherit" component={Link} to="/auth">
-            Sign In / Up
-          </Button>
-          <Button color="inherit" component={Link} to="/groups">
-            Groups
-          </Button>
-          {/* Only enable these when a group is selected */}
-          <Button
-            color="inherit"
-            component={Link}
-            to={groupId ? `/groups/${groupId}/bets` : '#'}
-            disabled={!groupId}
-          >
-            Bets
-          </Button>
-          <Button
-            color="inherit"
-            component={Link}
-            to={groupId ? `/groups/${groupId}/wallets` : '#'}
-            disabled={!groupId}
-          >
-            Wallets
-          </Button>
-        </Toolbar>
-      </AppBar>
+      <Routes>
+        {/* 1) Public auth */}
+        <Route path="/auth" element={<AuthPage />} />
 
-      <Container sx={{ mt: 4 }}>
-        <Routes>
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/groups" element={<GroupPage />} />
-          <Route path="/groups/:groupId/bets"    element={<BetPage />} />
-          <Route path="/groups/:groupId/wallets" element={<WalletPage />} />
-          <Route path="/" element={<Navigate to="/groups" replace />} />
-        </Routes>
-      </Container>
+        {/* 2) Dashboard layout with nested routes */}
+        <Route path="/dashboard/*" element={<MainPage />}>
+          {/* Redirect /dashboard → /dashboard/groups */}
+          <Route index element={<Navigate to="groups" replace />} />
+
+          {/* These will render inside <Outlet /> of MainPage */}
+          <Route path="groups"  element={<GroupPage  />} />
+          <Route path="wallets" element={<WalletPage />} />
+          <Route path="bets"    element={<BetPage    />} />
+
+          {/* Any other /dashboard/... → back to groups */}
+          <Route path="*" element={<Navigate to="groups" replace />} />
+        </Route>
+
+        {/* 3) Everything else → /auth */}
+        <Route path="*" element={<Navigate to="/auth" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }

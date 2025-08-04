@@ -30,7 +30,7 @@ export default function BetPage() {
   useEffect(() => {
     // if no group selected, redirect back to groups list
     if (!groupId) {
-      navigate('/groups');
+      navigate('/dashboard/groups');
       return;
     }
     loadBets();
