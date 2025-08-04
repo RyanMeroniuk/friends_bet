@@ -11,6 +11,9 @@ import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ryanmeroniuk.friends_bet.dto.WalletDepositRequest;
+import com.ryanmeroniuk.friends_bet.service.WalletService;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,15 +25,18 @@ public class BetService {
     private final BetRepository betRepo;
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
+    private final WalletService walletService;
 
     public BetService(
             BetRepository betRepo,
             GroupRepository groupRepo,
-            UserRepository userRepo
+            UserRepository userRepo,
+            WalletService walletService
     ) {
         this.betRepo = betRepo;
         this.groupRepo = groupRepo;
         this.userRepo = userRepo;
+        this.walletService = walletService;
     }
 
     /** Propose a new bet in a group. */
@@ -62,6 +68,13 @@ public class BetService {
         User acceptor = userRepo.findById(req.getAcceptorId())
                 .orElseThrow(() -> new IllegalArgumentException("Acceptor not found"));
 
+        // debit proposers stake
+        walletService.deposit(bet.getGroup().getId(), new WalletDepositRequest(bet.getProposer().getId(), -bet.getAmountCents()));
+
+        // debit acceptor stake
+        walletService.deposit(bet.getGroup().getId(), new WalletDepositRequest(acceptor.getId(), -bet.getAmountCents()));
+
+        // mark bet accepted
         bet.setAcceptor(acceptor);
         bet.setStatus("ACCEPTED");
         Bet updated = betRepo.save(bet);

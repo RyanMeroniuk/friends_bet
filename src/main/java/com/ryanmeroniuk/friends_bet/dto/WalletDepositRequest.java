@@ -7,6 +7,11 @@ public class WalletDepositRequest {
     private long amountCents;
 
     public WalletDepositRequest() {}
+
+    public WalletDepositRequest(UUID userId, long amountCents) {
+        this.userId = userId;
+        this.amountCents = amountCents;
+    }
     public UUID getUserId() { return userId; }
     public void setUserId(UUID userId) { this.userId = userId; }
     public long getAmountCents() { return amountCents; }
