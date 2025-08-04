@@ -5,7 +5,7 @@ import java.util.UUID;
 public class CreateBetRequest {
     private UUID groupId;
     private UUID proposerId;
-    private String gameId;
+    private UUID gameId;
     private String marketType;
     private String pick;
     private long amountCents;
@@ -19,8 +19,8 @@ public class CreateBetRequest {
     public UUID getProposerId() { return proposerId; }
     public void setProposerId(UUID proposerId) { this.proposerId = proposerId; }
 
-    public String getGameId() { return gameId; }
-    public void setGameId(String gameId) { this.gameId = gameId; }
+    public UUID getGameId() { return gameId; }
+    public void setGameId(UUID gameId) { this.gameId = gameId; }
 
     public String getMarketType() { return marketType; }
     public void setMarketType(String marketType) { this.marketType = marketType; }

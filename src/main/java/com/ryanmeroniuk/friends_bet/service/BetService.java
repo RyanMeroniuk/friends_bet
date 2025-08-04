@@ -4,9 +4,11 @@ import com.ryanmeroniuk.friends_bet.dto.AcceptBetRequest;
 import com.ryanmeroniuk.friends_bet.dto.BetResponse;
 import com.ryanmeroniuk.friends_bet.dto.CreateBetRequest;
 import com.ryanmeroniuk.friends_bet.model.Bet;
+import com.ryanmeroniuk.friends_bet.model.Game;
 import com.ryanmeroniuk.friends_bet.model.Group;
 import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.repository.BetRepository;
+import com.ryanmeroniuk.friends_bet.repository.GameRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -26,17 +28,20 @@ public class BetService {
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
     private final WalletService walletService;
+    private final GameRepository gameRepo;
 
     public BetService(
             BetRepository betRepo,
             GroupRepository groupRepo,
             UserRepository userRepo,
-            WalletService walletService
+            WalletService walletService,
+            GameRepository gameRepo
     ) {
         this.betRepo = betRepo;
         this.groupRepo = groupRepo;
         this.userRepo = userRepo;
         this.walletService = walletService;
+        this.gameRepo = gameRepo;
     }
 
     /** Propose a new bet in a group. */
@@ -47,9 +52,12 @@ public class BetService {
         User proposer = userRepo.findById(req.getProposerId())
                 .orElseThrow(() -> new IllegalArgumentException("Proposer not found"));
 
+        Game game = gameRepo.findById(req.getGameId())
+                .orElseThrow(() -> new IllegalArgumentException("Game not found"));
+
         Bet bet = new Bet(
                 group, proposer,
-                req.getGameId(), req.getMarketType(), req.getPick(),
+                game, req.getMarketType(), req.getPick(),
                 req.getAmountCents(), req.getOdds()
         );
         Bet saved = betRepo.save(bet);
@@ -97,7 +105,7 @@ public class BetService {
                 bet.getGroup().getId(),
                 bet.getProposer().getId(),
                 bet.getAcceptor() != null ? bet.getAcceptor().getId() : null,
-                bet.getGameId(),
+                bet.getGame().getId(),
                 bet.getMarketType(),
                 bet.getPick(),
                 bet.getAmountCents(),

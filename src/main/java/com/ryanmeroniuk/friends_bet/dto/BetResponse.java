@@ -8,7 +8,7 @@ public class BetResponse {
     private final UUID groupId;
     private final UUID proposerId;
     private final UUID acceptorId;    // null if not yet accepted
-    private final String gameId;
+    private final UUID gameId;
     private final String marketType;
     private final String pick;
     private final long amountCents;
@@ -19,7 +19,7 @@ public class BetResponse {
 
     public BetResponse(
             UUID id, UUID groupId, UUID proposerId, UUID acceptorId,
-            String gameId, String marketType, String pick,
+            UUID gameId, String marketType, String pick,
             long amountCents, double odds,
             String status, Instant createdAt, Instant resolvedAt
     ) {
@@ -41,7 +41,7 @@ public class BetResponse {
     public UUID getGroupId() { return groupId; }
     public UUID getProposerId() { return proposerId; }
     public UUID getAcceptorId() { return acceptorId; }
-    public String getGameId() { return gameId; }
+    public UUID getGameId() { return gameId; }
     public String getMarketType() { return marketType; }
     public String getPick() { return pick; }
     public long getAmountCents() { return amountCents; }

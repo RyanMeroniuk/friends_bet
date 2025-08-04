@@ -26,7 +26,6 @@ public class Bet {
     @JoinColumn(name = "game_id", nullable = false)
     private Game game;
 
-
     @Column(nullable = false)
     private String marketType;
 
