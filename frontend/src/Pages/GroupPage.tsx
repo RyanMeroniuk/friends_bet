@@ -28,6 +28,7 @@ export default function GroupPage() {
   }
 
   async function handleCreate() {
+      console.log("we are in the function")
     try {
       const grp = await createGroup(newName);
       setNewName('');
@@ -35,7 +36,6 @@ export default function GroupPage() {
       loadGroups();
       // automatically navigate into new group
       setGroupId(grp.id);
-      navigate(`/groups/${grp.id}/bets`);
     } catch (err: any) {
       setMessage(err.response?.data || 'Error creating group');
     }

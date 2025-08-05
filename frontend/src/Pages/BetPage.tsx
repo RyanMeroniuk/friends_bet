@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { listGroups } from '../api/group';
+import { listMyGroups } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import {
   Box,
@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 
 export default function BetPage() {
-  // Load all groups for the dropdown
+  // Load only groups the user belongs to
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [bets, setBets]       = useState<Bet[]>([]);
@@ -28,17 +28,19 @@ export default function BetPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
 
-  // 1) Load groups on mount
+  // 1) Load "my" groups on mount
   useEffect(() => {
-    listGroups()
+    const auth = JSON.parse(localStorage.getItem('authUser')!);
+    listMyGroups(auth.id)
       .then(gs => setGroups(gs.map(g => ({ id: g.id, name: g.name }))))
-      .catch(e => setError('Could not load groups'));
+      .catch(() => setError('Could not load your groups'));
   }, []);
 
   // 2) When selectedGroup changes, load its bets
   useEffect(() => {
     if (!selectedGroup) return;
     loadBets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroup]);
 
   async function loadBets() {

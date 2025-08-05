@@ -50,6 +50,6 @@ export async function joinGroup(
  * Returns only the groups this user belongs to.
  */
 export async function listMyGroups(userId: string): Promise<GroupResponse[]> {
-  const resp = await axios.get<GroupResponse[]>(`/api/users/${userId}/groups`);
+  const resp = await api.get<GroupResponse[]>(`/api/users/${userId}/groups`);
   return resp.data;
 }
