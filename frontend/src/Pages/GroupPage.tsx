@@ -28,18 +28,43 @@ export default function GroupPage() {
   }
 
   async function handleCreate() {
-      console.log("we are in the function")
+
     try {
+      // 1) Create the group
       const grp = await createGroup(newName);
+
+      // 2) Auto-join the creator to that group
+      const rawAuth = localStorage.getItem('authUser');
+      let currentUserId = '';
+      if (rawAuth) {
+        try {
+          const authUser = JSON.parse(rawAuth);
+          currentUserId = authUser.id;
+        } catch {
+          console.warn('Could not parse authUser from localStorage');
+        }
+      }
+      if (currentUserId) {
+        await joinGroup(grp.inviteCode, currentUserId);
+      }
+
+      // 3) Clear the input and show success feedback
       setNewName('');
-      setMessage('Group created');
-      loadGroups();
-      // automatically navigate into new group
+      setMessage('Group created and you’ve joined it!');
+
+      // 4) Reload the list so the new group (with you as a member) appears
+      await loadGroups();
+
+      // 5) Store the current group in context for later use
       setGroupId(grp.id);
+
+      // Note: we’re not navigating away—staying on the groups dashboard
     } catch (err: any) {
-      setMessage(err.response?.data || 'Error creating group');
+      console.error('handleCreate error:', err.response ?? err);
+      setMessage(err.response?.data || 'Error creating or joining group');
     }
   }
+
 
   async function handleJoin() {
     // 1) Clear any prior message
