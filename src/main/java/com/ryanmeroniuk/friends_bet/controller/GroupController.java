@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/groups")
+@RequestMapping("/api")
 public class GroupController {
 
     private final GroupService groupService;
@@ -26,18 +26,27 @@ public class GroupController {
         this.memberService = memberService;
     }
 
-    @PostMapping
+    /** Create a new group */
+    @PostMapping("/groups")
     public ResponseEntity<GroupResponse> create(@RequestBody CreateGroupRequest req) {
         GroupResponse resp = groupService.createGroup(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
-    @GetMapping
+    /** List all groups (admin view) */
+    @GetMapping("/groups")
     public List<GroupResponse> list() {
         return groupService.listGroups();
     }
 
-    @PostMapping("/{inviteCode}/join")
+    /** List groups the given user belongs to */
+    @GetMapping("/users/{userId}/groups")
+    public List<GroupResponse> listGroupsForUser(@PathVariable UUID userId) {
+        return groupService.listGroupsForUser(userId);
+    }
+
+    /** Join a group by invite code */
+    @PostMapping("/groups/{inviteCode}/join")
     public ResponseEntity<GroupMemberResponse> join(
             @PathVariable String inviteCode,
             @RequestBody JoinGroupRequest req
@@ -46,7 +55,8 @@ public class GroupController {
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
-    @GetMapping("/{groupId}/members")
+    /** List members of a group */
+    @GetMapping("/groups/{groupId}/members")
     public List<GroupMemberResponse> members(@PathVariable UUID groupId) {
         return memberService.listMembers(groupId);
     }
