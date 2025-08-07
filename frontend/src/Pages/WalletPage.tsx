@@ -21,21 +21,18 @@ export default function WalletPage() {
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [balance, setBalance] = useState<number | null>(null);
-  const [depositAmt, setDepositAmt] = useState<number>(0);
+  const [depositAmt, setDepositAmt] = useState<string>('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const auth = JSON.parse(localStorage.getItem('authUser') || '{}');
   const userId: string = auth.id;
 
-  // 1) load groups on mount
   useEffect(() => {
     listMyGroups(userId)
       .then(gs => setGroups(gs.map(g => ({ id: g.id, name: g.name }))))
       .catch(() => setError('Failed to load your groups'));
   }, [userId]);
 
-  // 2) when group changes, fetch balance
   useEffect(() => {
     if (!selectedGroup) {
       setBalance(null);
@@ -57,14 +54,22 @@ export default function WalletPage() {
   }
 
   async function handleDeposit() {
-    console.log('▶️ handleDeposit called:', { selectedGroup, depositAmt, userId });
     setMessage(null);
+    setError(null);
+
+    const amountCents = parseInt(depositAmt, 10);
+    if (isNaN(amountCents) || amountCents <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+
+    console.log('▶️ handleDeposit:', { selectedGroup, amountCents, userId });
+
     try {
-      const wallet = await deposit(selectedGroup, userId, depositAmt);
-      const newBal = wallet.balanceCents;
-      setMessage(`Deposited $${(depositAmt / 100).toFixed(2)}`);
-      setDepositAmt(0);
-      setBalance(newBal);
+      const wallet = await deposit(selectedGroup, userId, amountCents);
+      setMessage(`Deposited $${(amountCents / 100).toFixed(2)}`);
+      setDepositAmt('');
+      setBalance(wallet.balanceCents);
     } catch (e: any) {
       console.error('deposit error:', e.response ?? e);
       setError(e.response?.data || 'Error making deposit');
@@ -112,16 +117,14 @@ export default function WalletPage() {
           >
             <TextField
               label="Amount (cents)"
-              type="number"
+              type="text"
               value={depositAmt}
-              onChange={e => setDepositAmt(+e.target.value)}
+              onChange={e => setDepositAmt(e.target.value)}
+              placeholder="e.g. 1000"
+              inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
               required
             />
-            <Button
-              type="button"
-              variant="contained"
-              onClick={handleDeposit}
-            >
+            <Button type="button" variant="contained" onClick={handleDeposit}>
               Deposit
             </Button>
           </Box>
@@ -134,5 +137,5 @@ export default function WalletPage() {
         </>
       )}
     </Box>
-);
+  );
 }
