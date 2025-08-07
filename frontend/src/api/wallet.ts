@@ -5,17 +5,13 @@ export interface WalletResponse {
   balanceCents: number;
 }
 
-/**
- * GET /api/groups/{groupId}/wallets
- */
+/** Get all balances for a group */
 export async function listBalances(groupId: string): Promise<WalletResponse[]> {
   const resp = await api.get<WalletResponse[]>(`/api/groups/${groupId}/wallets`);
   return resp.data;
 }
 
-/**
- * POST /api/groups/{groupId}/wallets/deposit
- */
+/** Deposit into a user’s wallet */
 export async function deposit(
   groupId: string,
   userId: string,
@@ -26,4 +22,16 @@ export async function deposit(
     { userId, amountCents }
   );
   return resp.data;
+}
+
+/**
+ * fetch only the logged-in user’s balance for this group
+ */
+export async function getMyBalance(
+  groupId: string,
+  currentUserId: string
+): Promise<number> {
+  const all = await listBalances(groupId);
+  const me = all.find(w => w.userId === currentUserId);
+  return me ? me.balanceCents : 0;
 }
