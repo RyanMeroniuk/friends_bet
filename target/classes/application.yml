@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: friends_bet
+  profiles:
+    active: dev
+jwt:
+  secret: s4qr0OiO8Jfxsj1nAAcYVRWxPKgIfucQExCfFIrMzN0=
+  expiration-ms: 3600000
