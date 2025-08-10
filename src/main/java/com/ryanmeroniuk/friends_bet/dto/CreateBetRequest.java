@@ -1,7 +1,12 @@
 package com.ryanmeroniuk.friends_bet.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CreateBetRequest {
     private UUID groupId;
     private UUID proposerId;
@@ -10,6 +15,8 @@ public class CreateBetRequest {
     private String pick;
     private long amountCents;
     private double odds;
+    private Map<String, Object> details;
+    private Instant cutoffTime;
 
     public CreateBetRequest() {}
 
@@ -33,4 +40,10 @@ public class CreateBetRequest {
 
     public double getOdds() { return odds; }
     public void setOdds(double odds) { this.odds = odds; }
+
+    public Map<String, Object> getDetails() { return details; }
+    public void setDetails(Map<String, Object> details) { this.details = details; }
+
+    public Instant getCutoffTime() { return cutoffTime; }
+    public void setCutoffTime(Instant cutoffTime) { this.cutoffTime = cutoffTime; }
 }
