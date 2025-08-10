@@ -1,68 +1,84 @@
 package com.ryanmeroniuk.friends_bet.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
 @Table(name = "bets")
 public class Bet {
-    @Id @GeneratedValue
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "group_id", nullable = false)
-    private Group group;
+    @Column(name = "group_id", nullable = false)
+    private UUID groupId;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "proposer_id", nullable = false)
-    private User proposer;
+    @Column(name = "game_id", nullable = false)
+    private UUID gameId;
 
-    @ManyToOne
-    @JoinColumn(name = "acceptor_id")
-    private User acceptor;
+    @Column(name = "proposer_id", nullable = false)
+    private UUID proposerId;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "game_id", nullable = false)
-    private Game game;
+    @Column(name = "acceptor_id")
+    private UUID acceptorId;
 
-    @Column(nullable = false)
-    private String marketType;
+    @Column(name = "market_type", nullable = false, length = 255)
+    private String marketType; // e.g. WINNER, SPREAD, TOTALS, PLAYER_PROP, etc.
 
-    @Column(nullable = false)
-    private String pick;
+    @Column(name = "pick", nullable = false)
+    private String pick;       // e.g. "home", "away", "over", "under", or team/player key
 
-    @Column(nullable = false)
+    @Column(name = "amount_cents", nullable = false)
     private long amountCents;
 
-    @Column(nullable = false)
+    @Column(name = "odds", nullable = false)
     private double odds;
 
-    @Column(nullable = false)
-    private String status;
+    @Column(name = "status", nullable = false)
+    private String status;     // e.g. OPEN, ACCEPTED, SETTLED_WON, SETTLED_LOST, CANCELLED
 
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
 
-    @Column
+    @Column(name = "resolved_at")
     private Instant resolvedAt;
 
-    // JPA constructor
-    public Bet() {}
+    // Flexible per-market payload (JSONB)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details", columnDefinition = "jsonb", nullable = false)
+    private Map<String, Object> details = new HashMap<>();
 
+    // Quoted odds metadata (optional)
+    @Column(name = "quoted_at")
+    private Instant quotedAt;
 
-    public Bet(Group group, User proposer, Game game,
-               String marketType, String pick,
-               long amountCents, double odds) {
-        this.group = group;
-        this.proposer = proposer;
-        this.game = game;
-        this.marketType = marketType;
-        this.pick = pick;
-        this.amountCents = amountCents;
-        this.odds = odds;
-        this.status = "OPEN";
+    @Column(name = "source", length = 40)
+    private String source;     // e.g. "DK", "FD", "MGM", or "internal"
+
+    // When the bet can no longer be accepted/edited
+    @Column(name = "cutoff_time")
+    private Instant cutoffTime;
+
+    public Bet() {
+        // JPA
     }
+
+    // --- lifecycle ---
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) createdAt = Instant.now();
+        if (status == null) status = "OPEN";
+        if (details == null) details = new HashMap<>();
+    }
+
+    // --- getters/setters ---
 
     public UUID getId() {
         return id;
@@ -72,36 +88,36 @@ public class Bet {
         this.id = id;
     }
 
-    public Group getGroup() {
-        return group;
+    public UUID getGroupId() {
+        return groupId;
     }
 
-    public void setGroup(Group group) {
-        this.group = group;
+    public void setGroupId(UUID groupId) {
+        this.groupId = groupId;
     }
 
-    public User getProposer() {
-        return proposer;
+    public UUID getGameId() {
+        return gameId;
     }
 
-    public void setProposer(User proposer) {
-        this.proposer = proposer;
+    public void setGameId(UUID gameId) {
+        this.gameId = gameId;
     }
 
-    public User getAcceptor() {
-        return acceptor;
+    public UUID getProposerId() {
+        return proposerId;
     }
 
-    public void setAcceptor(User acceptor) {
-        this.acceptor = acceptor;
+    public void setProposerId(UUID proposerId) {
+        this.proposerId = proposerId;
     }
 
-    public Game getGame() {
-        return game;
+    public UUID getAcceptorId() {
+        return acceptorId;
     }
 
-    public void setGame(Game game) {
-        this.game = game;
+    public void setAcceptorId(UUID acceptorId) {
+        this.acceptorId = acceptorId;
     }
 
     public String getMarketType() {
@@ -158,5 +174,58 @@ public class Bet {
 
     public void setResolvedAt(Instant resolvedAt) {
         this.resolvedAt = resolvedAt;
+    }
+
+    public Map<String, Object> getDetails() {
+        return details;
+    }
+
+    public void setDetails(Map<String, Object> details) {
+        this.details = details;
+    }
+
+    public Instant getQuotedAt() {
+        return quotedAt;
+    }
+
+    public void setQuotedAt(Instant quotedAt) {
+        this.quotedAt = quotedAt;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public Instant getCutoffTime() {
+        return cutoffTime;
+    }
+
+    public void setCutoffTime(Instant cutoffTime) {
+        this.cutoffTime = cutoffTime;
+    }
+
+    @Override
+    public String toString() {
+        return "Bet{" +
+                "id=" + id +
+                ", groupId=" + groupId +
+                ", gameId=" + gameId +
+                ", proposerId=" + proposerId +
+                ", acceptorId=" + acceptorId +
+                ", marketType='" + marketType + '\'' +
+                ", pick='" + pick + '\'' +
+                ", amountCents=" + amountCents +
+                ", odds=" + odds +
+                ", status='" + status + '\'' +
+                ", createdAt=" + createdAt +
+                ", resolvedAt=" + resolvedAt +
+                ", quotedAt=" + quotedAt +
+                ", source='" + source + '\'' +
+                ", cutoffTime=" + cutoffTime +
+                '}';
     }
 }
