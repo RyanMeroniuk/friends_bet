@@ -9,4 +9,5 @@ import java.util.UUID;
 
 public interface BetRepository extends JpaRepository<Bet, UUID> {
     List<Bet> findAllByGroup(Group group);
+    List<Bet> findAllByGroupId(UUID groupId);
 }
