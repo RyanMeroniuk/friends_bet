@@ -1,10 +1,6 @@
 package com.ryanmeroniuk.friends_bet.service;
 
-import com.ryanmeroniuk.friends_bet.dto.AcceptBetRequest;
-import com.ryanmeroniuk.friends_bet.dto.BetMapper;
-import com.ryanmeroniuk.friends_bet.dto.BetResponse;
-import com.ryanmeroniuk.friends_bet.dto.CreateBetRequest;
-import com.ryanmeroniuk.friends_bet.dto.WalletDepositRequest;
+import com.ryanmeroniuk.friends_bet.dto.*;
 import com.ryanmeroniuk.friends_bet.model.Bet;
 import com.ryanmeroniuk.friends_bet.model.Game;
 import com.ryanmeroniuk.friends_bet.repository.BetRepository;
@@ -15,13 +11,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class BetService {
-
     private final BetRepository betRepo;
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
@@ -42,110 +40,144 @@ public class BetService {
         this.gameRepo = gameRepo;
     }
 
-    /** Propose a new bet in a group. */
+    /** Propose a new bet: escrow proposer only. */
     @Transactional
     public BetResponse propose(CreateBetRequest req) {
-        // Basic existence validation (cheap)
-        if (req.getGroupId() == null) throw new IllegalArgumentException("groupId is required");
-        if (req.getProposerId() == null) throw new IllegalArgumentException("proposerId is required");
-        if (req.getGameId() == null) throw new IllegalArgumentException("gameId is required");
+        // Validate existence
+        groupRepo.findById(req.getGroupId())
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+        userRepo.findById(req.getProposerId())
+                .orElseThrow(() -> new IllegalArgumentException("Proposer not found"));
+        gameRepo.findById(req.getGameId())
+                .orElseThrow(() -> new IllegalArgumentException("Game not found"));
 
-        if (!groupRepo.existsById(req.getGroupId())) {
-            throw new IllegalArgumentException("Group not found");
-        }
-        if (!userRepo.existsById(req.getProposerId())) {
-            throw new IllegalArgumentException("Proposer not found");
-        }
-        if (!gameRepo.existsById(req.getGameId())) {
-            throw new IllegalArgumentException("Game not found");
-        }
+        // Normalize market/pick
+        String market = normalizeMarket(req.getMarketType());
+        String pick = (req.getPick() == null) ? "" : req.getPick().trim().toUpperCase();
 
-        Bet bet = BetMapper.fromCreate(req.getGroupId(), req);
-        Bet saved = betRepo.save(bet);
+        // Escrow proposer stake (debit)
+        walletService.deposit(
+                req.getGroupId(),
+                new WalletDepositRequest(req.getProposerId(), -req.getAmountCents())
+        );
+
+        Bet b = new Bet();
+        b.setGroupId(req.getGroupId());
+        b.setGameId(req.getGameId());
+        b.setProposerId(req.getProposerId());
+        b.setMarketType(market);
+        b.setPick(pick);
+        b.setAmountCents(req.getAmountCents());
+        b.setAcceptorStakeCents(0L);
+        b.setOdds(req.getOdds());
+        b.setStatus("OPEN");
+        b.setDetails(req.getDetails() == null ? Map.of() : req.getDetails());
+        b.setCutoffTime(req.getCutoffTime());
+
+        Bet saved = betRepo.save(b);
         return BetMapper.toResponse(saved);
     }
 
-    /** Accept an existing open bet. */
+    /** Accept: escrow acceptor only (A*(odds-1)), set acceptor & move to ACCEPTED. */
     @Transactional
     public BetResponse accept(UUID betId, AcceptBetRequest req) {
         Bet bet = betRepo.findById(betId)
                 .orElseThrow(() -> new IllegalArgumentException("Bet not found"));
-
         if (!"OPEN".equals(bet.getStatus())) {
             throw new IllegalArgumentException("Cannot accept bet in status: " + bet.getStatus());
         }
-        if (req.getAcceptorId() == null) {
-            throw new IllegalArgumentException("acceptorId is required");
+        if (bet.getCutoffTime() != null && Instant.now().isAfter(bet.getCutoffTime())) {
+            throw new IllegalArgumentException("Bet is closed for accepting");
         }
-        if (!userRepo.existsById(req.getAcceptorId())) {
-            throw new IllegalArgumentException("Acceptor not found");
+        UUID acceptorId = req.getAcceptorId();
+        if (acceptorId == null) throw new IllegalArgumentException("Acceptor required");
+        userRepo.findById(acceptorId)
+                .orElseThrow(() -> new IllegalArgumentException("Acceptor not found"));
+        if (acceptorId.equals(bet.getProposerId())) {
+            throw new IllegalArgumentException("Proposer cannot accept own bet");
         }
 
-        // debit proposer's stake
+        long proposerStake = bet.getAmountCents();
+        long acceptorStake = calcAcceptorStake(proposerStake, bet.getOdds());
+
+        // Escrow acceptor stake
         walletService.deposit(
                 bet.getGroupId(),
-                new WalletDepositRequest(bet.getProposerId(), -bet.getAmountCents())
+                new WalletDepositRequest(acceptorId, -acceptorStake)
         );
 
-        // debit acceptor's stake
-        walletService.deposit(
-                bet.getGroupId(),
-                new WalletDepositRequest(req.getAcceptorId(), -bet.getAmountCents())
-        );
-
-        // mark bet accepted
-        bet.setAcceptorId(req.getAcceptorId());
+        bet.setAcceptorId(acceptorId);
+        bet.setAcceptorStakeCents(acceptorStake);
         bet.setStatus("ACCEPTED");
-        Bet updated = betRepo.save(bet);
 
+        Bet updated = betRepo.save(bet);
         return BetMapper.toResponse(updated);
     }
 
     /** List all bets for a group. */
     public List<BetResponse> listByGroup(UUID groupId) {
-        if (!groupRepo.existsById(groupId)) {
-            throw new IllegalArgumentException("Group not found");
-        }
-        // NOTE: update BetRepository to have: List<Bet> findAllByGroupId(UUID groupId);
+        groupRepo.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
         return BetMapper.toResponse(betRepo.findAllByGroupId(groupId));
     }
 
-    /**
-     * Every minute: find all ACCEPTED bets whose game.startTime is in the past,
-     * determine a winner, and transfer funds accordingly.
-     */
+    /** Settle accepted bets whose games have started (stub rule). */
     @Scheduled(fixedRate = 60_000)
     @Transactional
     public void settleBets() {
         Instant now = Instant.now();
+        List<Bet> accepted = betRepo.findAll().stream()
+                .filter(b -> "ACCEPTED".equals(b.getStatus()))
+                .toList();
 
-        // Pull all bets (keep simple for now); you can add a repo method to filter by status if you like.
-        for (Bet bet : betRepo.findAll()) {
-            if (!"ACCEPTED".equals(bet.getStatus())) continue;
+        for (Bet b : accepted) {
+            // Only settle if game start is in the past
+            Game g = gameRepo.findById(b.getGameId()).orElse(null);
+            if (g == null || g.getStartTime() == null || g.getStartTime().isAfter(now)) {
+                continue;
+            }
 
-            // Load the game to check start time (no relation on Bet anymore)
-            Game game = gameRepo.findById(bet.getGameId()).orElse(null);
-            if (game == null || game.getStartTime() == null) continue;
-            if (game.getStartTime().isAfter(now)) continue;
-
-            // Determine winner (stub)
-            UUID winnerId = determineWinner(bet);
-            if (winnerId == null) continue;
-
-            long payoutCents = Math.round(bet.getAmountCents() * bet.getOdds());
-
-            walletService.deposit(
-                    bet.getGroupId(),
-                    new WalletDepositRequest(winnerId, payoutCents)
-            );
-
-            bet.setStatus("RESOLVED");
-            bet.setResolvedAt(now);
-            betRepo.save(bet);
+            UUID winnerId = determineWinner(b);
+            if (winnerId == null) {
+                // VOID – refund both stakes
+                walletService.deposit(b.getGroupId(), new WalletDepositRequest(b.getProposerId(), b.getAmountCents()));
+                walletService.deposit(b.getGroupId(), new WalletDepositRequest(b.getAcceptorId(), b.getAcceptorStakeCents()));
+                b.setStatus("VOID");
+            } else {
+                long pool = b.getAmountCents() + b.getAcceptorStakeCents();
+                walletService.deposit(b.getGroupId(), new WalletDepositRequest(winnerId, pool));
+                b.setStatus("RESOLVED");
+            }
+            b.setResolvedAt(now);
+            betRepo.save(b);
         }
     }
 
-    /** Stub for determining winner—replace with real logic. */
+
+
+    private static long calcAcceptorStake(long proposerStake, double odds) {
+        // acceptorStake = round( A * (odds - 1) )
+        return BigDecimal.valueOf(proposerStake)
+                .multiply(BigDecimal.valueOf(odds).subtract(BigDecimal.ONE))
+                .setScale(0, RoundingMode.HALF_UP)
+                .longValueExact();
+    }
+
+    private static String normalizeMarket(String mt) {
+        if (mt == null) return "WINNER";
+        return switch (mt.trim().toUpperCase()) {
+            case "WIN", "ML", "MONEYLINE", "WINNER" -> "WINNER";
+            case "SPREAD" -> "SPREAD";
+            case "TOTALS", "OU", "OVER_UNDER" -> "TOTALS";
+            case "PLAYER_PROP" -> "PLAYER_PROP";
+            case "TEAM_PROP" -> "TEAM_PROP";
+            case "SAME_GAME", "SGP" -> "SAME_GAME";
+            case "PARLAY" -> "PARLAY";
+            default -> mt.trim().toUpperCase();
+        };
+    }
+
+    /** TEMP stub; replace with real result lookup */
     private UUID determineWinner(Bet bet) {
         if (bet.getAcceptorId() == null) return bet.getProposerId();
         return Math.random() < 0.5 ? bet.getProposerId() : bet.getAcceptorId();

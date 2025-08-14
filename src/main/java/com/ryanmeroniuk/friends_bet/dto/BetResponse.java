@@ -13,6 +13,7 @@ public record BetResponse(
         String marketType,
         String pick,
         long amountCents,
+        long acceptorStakeCents,
         double odds,
         String status,
         Instant createdAt,

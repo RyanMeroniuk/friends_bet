@@ -14,7 +14,7 @@ import java.util.UUID;
 public class Bet {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue
     private UUID id;
 
     @Column(name = "group_id", nullable = false)
@@ -29,20 +29,25 @@ public class Bet {
     @Column(name = "acceptor_id")
     private UUID acceptorId;
 
-    @Column(name = "market_type", nullable = false, length = 255)
-    private String marketType; // e.g. WINNER, SPREAD, TOTALS, PLAYER_PROP, etc.
+    @Column(name = "market_type", nullable = false)
+    private String marketType;
 
     @Column(name = "pick", nullable = false)
-    private String pick;       // e.g. "home", "away", "over", "under", or team/player key
+    private String pick;
 
+    /** Proposer stake (A) in cents */
     @Column(name = "amount_cents", nullable = false)
-    private long amountCents;
+    private Long amountCents;
+
+    /** Acceptor stake in cents = round(A * (odds - 1)) */
+    @Column(name = "acceptor_stake_cents", nullable = false)
+    private Long acceptorStakeCents = 0L;
 
     @Column(name = "odds", nullable = false)
     private double odds;
 
     @Column(name = "status", nullable = false)
-    private String status;     // e.g. OPEN, ACCEPTED, SETTLED_WON, SETTLED_LOST, CANCELLED
+    private String status = "OPEN";
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -50,182 +55,78 @@ public class Bet {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
-    // Flexible per-market payload (JSONB)
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "details", columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> details = new HashMap<>();
 
-    // Quoted odds metadata (optional)
     @Column(name = "quoted_at")
     private Instant quotedAt;
 
     @Column(name = "source", length = 40)
-    private String source;     // e.g. "DK", "FD", "MGM", or "internal"
+    private String source;
 
-    // When the bet can no longer be accepted/edited
     @Column(name = "cutoff_time")
     private Instant cutoffTime;
 
-    public Bet() {
-        // JPA
-    }
-
-    // --- lifecycle ---
     @PrePersist
     public void prePersist() {
         if (createdAt == null) createdAt = Instant.now();
         if (status == null) status = "OPEN";
         if (details == null) details = new HashMap<>();
+        if (source == null) source = "internal";
+        if (quotedAt == null) quotedAt = Instant.now();
     }
 
-    // --- getters/setters ---
+    // Getters & Setters
 
-    public UUID getId() {
-        return id;
-    }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
+    public UUID getGroupId() { return groupId; }
+    public void setGroupId(UUID groupId) { this.groupId = groupId; }
 
-    public UUID getGroupId() {
-        return groupId;
-    }
+    public UUID getGameId() { return gameId; }
+    public void setGameId(UUID gameId) { this.gameId = gameId; }
 
-    public void setGroupId(UUID groupId) {
-        this.groupId = groupId;
-    }
+    public UUID getProposerId() { return proposerId; }
+    public void setProposerId(UUID proposerId) { this.proposerId = proposerId; }
 
-    public UUID getGameId() {
-        return gameId;
-    }
+    public UUID getAcceptorId() { return acceptorId; }
+    public void setAcceptorId(UUID acceptorId) { this.acceptorId = acceptorId; }
 
-    public void setGameId(UUID gameId) {
-        this.gameId = gameId;
-    }
+    public String getMarketType() { return marketType; }
+    public void setMarketType(String marketType) { this.marketType = marketType; }
 
-    public UUID getProposerId() {
-        return proposerId;
-    }
+    public String getPick() { return pick; }
+    public void setPick(String pick) { this.pick = pick; }
 
-    public void setProposerId(UUID proposerId) {
-        this.proposerId = proposerId;
-    }
+    public long getAmountCents() { return amountCents; }
+    public void setAmountCents(long amountCents) { this.amountCents = amountCents; }
 
-    public UUID getAcceptorId() {
-        return acceptorId;
-    }
+    public long getAcceptorStakeCents() { return acceptorStakeCents; }
+    public void setAcceptorStakeCents(long acceptorStakeCents) { this.acceptorStakeCents = acceptorStakeCents; }
 
-    public void setAcceptorId(UUID acceptorId) {
-        this.acceptorId = acceptorId;
-    }
+    public double getOdds() { return odds; }
+    public void setOdds(double odds) { this.odds = odds; }
 
-    public String getMarketType() {
-        return marketType;
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public void setMarketType(String marketType) {
-        this.marketType = marketType;
-    }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 
-    public String getPick() {
-        return pick;
-    }
+    public Instant getResolvedAt() { return resolvedAt; }
+    public void setResolvedAt(Instant resolvedAt) { this.resolvedAt = resolvedAt; }
 
-    public void setPick(String pick) {
-        this.pick = pick;
-    }
+    public Map<String, Object> getDetails() { return details; }
+    public void setDetails(Map<String, Object> details) { this.details = details; }
 
-    public long getAmountCents() {
-        return amountCents;
-    }
+    public Instant getQuotedAt() { return quotedAt; }
+    public void setQuotedAt(Instant quotedAt) { this.quotedAt = quotedAt; }
 
-    public void setAmountCents(long amountCents) {
-        this.amountCents = amountCents;
-    }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
 
-    public double getOdds() {
-        return odds;
-    }
-
-    public void setOdds(double odds) {
-        this.odds = odds;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getResolvedAt() {
-        return resolvedAt;
-    }
-
-    public void setResolvedAt(Instant resolvedAt) {
-        this.resolvedAt = resolvedAt;
-    }
-
-    public Map<String, Object> getDetails() {
-        return details;
-    }
-
-    public void setDetails(Map<String, Object> details) {
-        this.details = details;
-    }
-
-    public Instant getQuotedAt() {
-        return quotedAt;
-    }
-
-    public void setQuotedAt(Instant quotedAt) {
-        this.quotedAt = quotedAt;
-    }
-
-    public String getSource() {
-        return source;
-    }
-
-    public void setSource(String source) {
-        this.source = source;
-    }
-
-    public Instant getCutoffTime() {
-        return cutoffTime;
-    }
-
-    public void setCutoffTime(Instant cutoffTime) {
-        this.cutoffTime = cutoffTime;
-    }
-
-    @Override
-    public String toString() {
-        return "Bet{" +
-                "id=" + id +
-                ", groupId=" + groupId +
-                ", gameId=" + gameId +
-                ", proposerId=" + proposerId +
-                ", acceptorId=" + acceptorId +
-                ", marketType='" + marketType + '\'' +
-                ", pick='" + pick + '\'' +
-                ", amountCents=" + amountCents +
-                ", odds=" + odds +
-                ", status='" + status + '\'' +
-                ", createdAt=" + createdAt +
-                ", resolvedAt=" + resolvedAt +
-                ", quotedAt=" + quotedAt +
-                ", source='" + source + '\'' +
-                ", cutoffTime=" + cutoffTime +
-                '}';
-    }
+    public Instant getCutoffTime() { return cutoffTime; }
+    public void setCutoffTime(Instant cutoffTime) { this.cutoffTime = cutoffTime; }
 }
