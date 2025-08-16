@@ -43,24 +43,42 @@ public class BetService {
     /** Propose a new bet: escrow proposer only. */
     @Transactional
     public BetResponse propose(CreateBetRequest req) {
-        // Validate existence
+        // 0) Cheap guards first (no DB/work if invalid)
+        if (req.getAmountCents() <= 0) {
+            throw new IllegalArgumentException("amountCents must be > 0");
+        }
+        if (req.getOdds() <= 1.0) {
+            throw new IllegalArgumentException("odds must be > 1.0");
+        }
+        if (req.getCutoffTime() != null && req.getCutoffTime().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("cutoffTime must be in the future");
+        }
+
+        // 1) Validate existence
         groupRepo.findById(req.getGroupId())
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
         userRepo.findById(req.getProposerId())
                 .orElseThrow(() -> new IllegalArgumentException("Proposer not found"));
-        gameRepo.findById(req.getGameId())
+        Game game = gameRepo.findById(req.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("Game not found"));
 
-        // Normalize market/pick
+        // (Optional) keep cutoff before game start
+        if (req.getCutoffTime() != null && game.getStartTime() != null
+                && req.getCutoffTime().isAfter(game.getStartTime())) {
+            throw new IllegalArgumentException("cutoffTime must be ≤ game start time");
+        }
+
+        // 2) Normalize inputs
         String market = normalizeMarket(req.getMarketType());
         String pick = (req.getPick() == null) ? "" : req.getPick().trim().toUpperCase();
 
-        // Escrow proposer stake (debit)
+        // 3) Escrow proposer stake (debit)
         walletService.deposit(
                 req.getGroupId(),
                 new WalletDepositRequest(req.getProposerId(), -req.getAmountCents())
         );
 
+        // 4) Create and persist bet
         Bet b = new Bet();
         b.setGroupId(req.getGroupId());
         b.setGameId(req.getGameId());

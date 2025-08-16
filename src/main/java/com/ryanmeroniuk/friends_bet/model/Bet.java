@@ -37,11 +37,11 @@ public class Bet {
 
     /** Proposer stake (A) in cents */
     @Column(name = "amount_cents", nullable = false)
-    private Long amountCents;
+    private long amountCents;
 
     /** Acceptor stake in cents = round(A * (odds - 1)) */
     @Column(name = "acceptor_stake_cents", nullable = false)
-    private Long acceptorStakeCents = 0L;
+    private long acceptorStakeCents = 0L;
 
     @Column(name = "odds", nullable = false)
     private double odds;
