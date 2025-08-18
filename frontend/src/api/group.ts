@@ -15,6 +15,14 @@ export interface JoinGroupRequest {
   userId: string;
 }
 
+/** group member shape coming from /api/groups/{groupId}/members */
+export interface GroupMemberResponse {
+  id: string;
+  groupId: string;
+  userId: string;
+  joinedAt: string;
+}
+
 /**
  * GET /api/groups
  */
@@ -38,10 +46,7 @@ export async function joinGroup(
   inviteCode: string,
   userId: string
 ): Promise<GroupResponse> {
-  const resp = await api.post<GroupResponse>(
-    `/api/groups/${inviteCode}/join`,
-    { userId }
-  );
+  const resp = await api.post<GroupResponse>(`/api/groups/${inviteCode}/join`, { userId });
   return resp.data;
 }
 
@@ -51,5 +56,11 @@ export async function joinGroup(
  */
 export async function listMyGroups(userId: string): Promise<GroupResponse[]> {
   const resp = await api.get<GroupResponse[]>(`/api/users/${userId}/groups`);
+  return resp.data;
+}
+
+/** NEW: GET /api/groups/{groupId}/members */
+export async function listGroupMembers(groupId: string): Promise<GroupMemberResponse[]> {
+  const resp = await api.get<GroupMemberResponse[]>(`/api/groups/${groupId}/members`);
   return resp.data;
 }
