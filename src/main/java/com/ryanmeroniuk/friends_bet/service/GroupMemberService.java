@@ -77,7 +77,8 @@ public class GroupMemberService {
                 saved.getId(),
                 group.getId(),
                 user.getId(),
-                saved.getJoinedAt()
+                saved.getJoinedAt(),
+                user.getUsername()
         );
     }
 
@@ -93,7 +94,8 @@ public class GroupMemberService {
                         m.getId(),
                         groupId,
                         m.getUser().getId(),
-                        m.getJoinedAt()
+                        m.getJoinedAt(),
+                        m.getUser().getUsername()
                 ))
                 .collect(Collectors.toList());
     }
