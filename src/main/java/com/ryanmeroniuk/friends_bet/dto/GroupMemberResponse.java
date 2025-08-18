@@ -9,12 +9,14 @@ public class GroupMemberResponse {
     private UUID groupId;
     private UUID userId;
     private Instant joinedAt;
+    private String username;
 
-    public GroupMemberResponse(UUID id, UUID groupId, UUID userId, Instant joinedAt){
+    public GroupMemberResponse(UUID id, UUID groupId, UUID userId, Instant joinedAt, String username){
         this.id = id;
         this.groupId = groupId;
         this.userId = userId;
         this.joinedAt = joinedAt;
+        this.username = username;
     }
 
     public UUID getId() {
@@ -28,4 +30,8 @@ public class GroupMemberResponse {
 
     public Instant getJoinedAt() {
         return joinedAt; }
+
+    public String getUsername() {
+        return username;
+    }
 }
