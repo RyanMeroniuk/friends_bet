@@ -35,6 +35,14 @@ export default function MainPage() {
     navigate('/auth');
   };
 
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(user.id);
+    } catch {
+      // ignore copy failures
+    }
+  };
+
   const drawerWidth = 240;
 
   return (
@@ -45,12 +53,19 @@ export default function MainPage() {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             FriendsBet
           </Typography>
+
+          {/* Logged-in user info */}
           <Typography variant="body1" sx={{ mr: 2 }}>
             {user.username}
           </Typography>
           <Typography variant="body2" sx={{ mr: 2 }}>
             ({user.email})
           </Typography>
+          <Typography variant="body2" sx={{ mr: 1 }}>
+            ID: <code>{user.id}</code>
+          </Typography>
+          <button onClick={copyId} style={{ marginRight: 12 }}>Copy ID</button>
+
           <button onClick={logout}>Logout</button>
         </Toolbar>
       </AppBar>
