@@ -21,6 +21,7 @@ export interface GroupMemberResponse {
   groupId: string;
   userId: string;
   joinedAt: string;
+  username: string;
 }
 
 /**

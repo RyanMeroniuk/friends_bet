@@ -269,7 +269,7 @@ export default function GroupPage() {
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {members.map(m => (
                       <li key={m.id}>
-                        <code>{m.userId}</code>{' '}
+                        <strong>{m.username || m.userId}</strong>{' '}
                         <span style={{ color: '#666', fontSize: 12 }}>
                           (joined {new Date(m.joinedAt).toLocaleString()})
                         </span>
