@@ -3,13 +3,11 @@ package com.ryanmeroniuk.friends_bet.service;
 import com.ryanmeroniuk.friends_bet.dto.*;
 import com.ryanmeroniuk.friends_bet.model.Bet;
 import com.ryanmeroniuk.friends_bet.model.Game;
-import com.ryanmeroniuk.friends_bet.repository.BetRepository;
-import com.ryanmeroniuk.friends_bet.repository.GameRepository;
-import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
-import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import com.ryanmeroniuk.friends_bet.repository.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,31 +23,37 @@ public class BetService {
     private final UserRepository userRepo;
     private final WalletService walletService;
     private final GameRepository gameRepo;
+    private final GroupMemberRepository groupMemberRepo;
 
     public BetService(
             BetRepository betRepo,
             GroupRepository groupRepo,
             UserRepository userRepo,
             WalletService walletService,
-            GameRepository gameRepo
+            GameRepository gameRepo,
+            GroupMemberRepository groupMemberRepo
     ) {
         this.betRepo = betRepo;
         this.groupRepo = groupRepo;
         this.userRepo = userRepo;
         this.walletService = walletService;
         this.gameRepo = gameRepo;
+        this.groupMemberRepo = groupMemberRepo;
     }
 
     /** Propose a new bet: escrow proposer only. */
+    /** Propose a new bet: escrow proposer only. */
     @Transactional
     public BetResponse propose(CreateBetRequest req) {
-        // 0) Cheap guards first (no DB/work if invalid)
-        if (req.getAmountCents() <= 0) {
-            throw new IllegalArgumentException("amountCents must be > 0");
+        UUID actor = currentUserId();
+        if (req.getProposerId() != null && !actor.equals(req.getProposerId())) {
+            throw new IllegalArgumentException("Proposer must be the authenticated user");
         }
-        if (req.getOdds() <= 1.0) {
-            throw new IllegalArgumentException("odds must be > 1.0");
-        }
+        req.setProposerId(actor);
+
+        // 0) Cheap guards
+        if (req.getAmountCents() <= 0) throw new IllegalArgumentException("amountCents must be > 0");
+        if (req.getOdds() <= 1.0)      throw new IllegalArgumentException("odds must be > 1.0");
         if (req.getCutoffTime() != null && req.getCutoffTime().isBefore(Instant.now())) {
             throw new IllegalArgumentException("cutoffTime must be in the future");
         }
@@ -62,6 +66,16 @@ public class BetService {
         Game game = gameRepo.findById(req.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("Game not found"));
 
+        // 1a) Must be a member of the group
+        if (!groupMemberRepo.existsByGroup_IdAndUser_Id(req.getGroupId(), req.getProposerId())) {
+            throw new IllegalArgumentException("Proposer is not a member of the group");
+        }
+
+        // 1b) Do not allow proposing after game start
+        if (game.getStartTime() != null && Instant.now().isAfter(game.getStartTime())) {
+            throw new IllegalArgumentException("Game already started");
+        }
+
         // (Optional) keep cutoff before game start
         if (req.getCutoffTime() != null && game.getStartTime() != null
                 && req.getCutoffTime().isAfter(game.getStartTime())) {
@@ -70,15 +84,19 @@ public class BetService {
 
         // 2) Normalize inputs
         String market = normalizeMarket(req.getMarketType());
-        String pick = (req.getPick() == null) ? "" : req.getPick().trim().toUpperCase();
+        String pick   = (req.getPick() == null) ? "" : req.getPick().trim().toUpperCase();
 
-        // 3) Escrow proposer stake (debit)
+        // 3) Ensure funds & escrow proposer stake (debit)
+        // If your WalletService already blocks negative balances inside deposit(), you can omit this check.
+        // Otherwise uncomment the next line and implement getBalance/ensure in WalletService.
+        // walletService.ensureSufficientBalance(req.getGroupId(), req.getProposerId(), req.getAmountCents());
+
         walletService.deposit(
                 req.getGroupId(),
                 new WalletDepositRequest(req.getProposerId(), -req.getAmountCents())
         );
 
-        // 4) Create and persist bet
+        // 4) Persist bet
         Bet b = new Bet();
         b.setGroupId(req.getGroupId());
         b.setGameId(req.getGameId());
@@ -99,38 +117,50 @@ public class BetService {
     /** Accept: escrow acceptor only (A*(odds-1)), set acceptor & move to ACCEPTED. */
     @Transactional
     public BetResponse accept(UUID betId, AcceptBetRequest req) {
+        UUID actor = currentUserId();
+        if (req.getAcceptorId() != null && !actor.equals(req.getAcceptorId())) {
+            throw new IllegalArgumentException("Acceptor must be the authenticated user");
+        }
+        req.setAcceptorId(actor);
+
         Bet bet = betRepo.findById(betId)
                 .orElseThrow(() -> new IllegalArgumentException("Bet not found"));
+
         if (!"OPEN".equals(bet.getStatus())) {
             throw new IllegalArgumentException("Cannot accept bet in status: " + bet.getStatus());
         }
         if (bet.getCutoffTime() != null && Instant.now().isAfter(bet.getCutoffTime())) {
             throw new IllegalArgumentException("Bet is closed for accepting");
         }
-        UUID acceptorId = req.getAcceptorId();
-        if (acceptorId == null) throw new IllegalArgumentException("Acceptor required");
-        userRepo.findById(acceptorId)
-                .orElseThrow(() -> new IllegalArgumentException("Acceptor not found"));
-        if (acceptorId.equals(bet.getProposerId())) {
+        if (actor.equals(bet.getProposerId())) {
             throw new IllegalArgumentException("Proposer cannot accept own bet");
+        }
+
+        // Must be a member of the group
+        if (!groupMemberRepo.existsByGroup_IdAndUser_Id(bet.getGroupId(), actor)) {
+            throw new IllegalArgumentException("Acceptor is not a member of the group");
         }
 
         long proposerStake = bet.getAmountCents();
         long acceptorStake = calcAcceptorStake(proposerStake, bet.getOdds());
 
-        // Escrow acceptor stake
+        // Ensure funds & escrow acceptor stake (debit)
+        // See note above re: enforcing inside WalletService.deposit(...)
+        // walletService.ensureSufficientBalance(bet.getGroupId(), actor, acceptorStake);
+
         walletService.deposit(
                 bet.getGroupId(),
-                new WalletDepositRequest(acceptorId, -acceptorStake)
+                new WalletDepositRequest(actor, -acceptorStake)
         );
 
-        bet.setAcceptorId(acceptorId);
+        bet.setAcceptorId(actor);
         bet.setAcceptorStakeCents(acceptorStake);
         bet.setStatus("ACCEPTED");
 
         Bet updated = betRepo.save(bet);
         return BetMapper.toResponse(updated);
     }
+
 
     /** List all bets for a group. */
     public List<BetResponse> listByGroup(UUID groupId) {
@@ -200,4 +230,12 @@ public class BetService {
         if (bet.getAcceptorId() == null) return bet.getProposerId();
         return Math.random() < 0.5 ? bet.getProposerId() : bet.getAcceptorId();
     }
+
+    private UUID currentUserId() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepo.findByUsername(username)
+                .map(u -> u.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Auth user not found"));
+    }
+
 }

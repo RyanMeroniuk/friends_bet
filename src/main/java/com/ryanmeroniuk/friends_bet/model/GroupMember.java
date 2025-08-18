@@ -6,7 +6,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "group_members")
+@Table(
+        name = "group_members",
+        uniqueConstraints = @UniqueConstraint(name = "uk_group_user", columnNames = {"group_id","user_id"})
+)
 public class GroupMember {
 
     @Id
