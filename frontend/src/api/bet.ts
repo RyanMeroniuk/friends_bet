@@ -10,6 +10,8 @@ export interface Bet {
   amountCents: number;
   odds: number;
   status: string;
+  details?: Record<string, any>;
+  acceptorStakeCents?: number;
 }
 
 export async function listBets(groupId: string): Promise<Bet[]> {
@@ -24,19 +26,17 @@ export async function proposeBet(
   marketType: string,
   pick: string,
   amountCents: number,
-  odds: number
+  odds: number,
+  details?: Record<string, any>
 ): Promise<Bet> {
-  const resp = await api.post<Bet>(
-    `/api/groups/${groupId}/bets`,
-    { proposerId, gameId, marketType, pick, amountCents, odds }
-  );
+  const payload: any = { proposerId, gameId, marketType, pick, amountCents, odds };
+  if (details) payload.details = details;
+
+  const resp = await api.post<Bet>(`/api/groups/${groupId}/bets`, payload);
   return resp.data;
 }
 
 export async function acceptBet(betId: string, acceptorId: string): Promise<Bet> {
-  const resp = await api.post<Bet>(
-    `/api/bets/${betId}/accept`,
-    { acceptorId }
-  );
+  const resp = await api.post<Bet>(`/api/bets/${betId}/accept`, { acceptorId });
   return resp.data;
 }
