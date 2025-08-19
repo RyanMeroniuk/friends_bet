@@ -26,7 +26,7 @@ type MarketType =
   | 'PARLAY';
 
 export default function BetPage() {
-  // groups + selection (keep GroupResponse so we can show inviteCode on left)
+  // groups + selection (left panel unchanged)
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
 
@@ -40,32 +40,36 @@ export default function BetPage() {
   const [userId, setUserId] = useState<string>(auth?.id ?? '');
   const [gameId, setGameId] = useState<string>('');
   const [marketType, setMarketType] = useState<MarketType>('WINNER');
-  const [pick, setPick] = useState<string>('HOME'); // used for WINNER & SPREAD team selection
+  const [pick, setPick] = useState<string>('HOME'); // WINNER/SPREAD team
   const [amountCents, setAmountCents] = useState<string>(''); // free typing
   const [odds, setOdds] = useState<number>(1.8);
 
   // SPREAD
   const [spreadPoints, setSpreadPoints] = useState<string>(''); // "-3.5"
 
+  // TOTALS (Over/Under)
+  const [totalsLine, setTotalsLine] = useState<string>(''); // "210.5"
+  const [totalsDirection, setTotalsDirection] = useState<'OVER' | 'UNDER'>('OVER');
+
   // PLAYER_PROP
   const [ppPlayerName, setPpPlayerName] = useState('');
   const [ppStatType, setPpStatType] = useState<'POINTS' | 'REBOUNDS' | 'ASSISTS' | 'GOALS' | 'SAVES' | 'CUSTOM'>('POINTS');
-  const [ppLine, setPpLine] = useState<string>(''); // e.g. "22.5"
+  const [ppLine, setPpLine] = useState<string>('');
   const [ppDirection, setPpDirection] = useState<'OVER' | 'UNDER'>('OVER');
 
   // TEAM_PROP
   const [tpTeam, setTpTeam] = useState<'HOME' | 'AWAY'>('HOME');
-  const [tpPropType, setTpPropType] = useState('TOTAL_POINTS'); // free text/enum
-  const [tpLine, setTpLine] = useState<string>('');            // "100.5"
+  const [tpPropType, setTpPropType] = useState('TOTAL_POINTS');
+  const [tpLine, setTpLine] = useState<string>('');
   const [tpDirection, setTpDirection] = useState<'OVER' | 'UNDER'>('OVER');
 
-  // SAME_GAME (SGP) — simple: freeform legs list (one per line)
-  const [sgpLegs, setSgpLegs] = useState<string>(''); // multiline
+  // SAME_GAME
+  const [sgpLegs, setSgpLegs] = useState<string>('');
 
-  // PARLAY — freeform legs list (one per line)
+  // PARLAY
   const [parlayLegs, setParlayLegs] = useState<string>('');
 
-  // styles (left sidebar list)
+  // styles for left list
   const listItem = (active: boolean): React.CSSProperties => ({
     padding: '0.55rem 0.65rem',
     borderRadius: 6,
@@ -105,6 +109,8 @@ export default function BetPage() {
 
   function resetMarketSpecificFields() {
     setSpreadPoints('');
+    setTotalsLine('');
+    setTotalsDirection('OVER');
     setPpPlayerName('');
     setPpStatType('POINTS');
     setPpLine('');
@@ -121,18 +127,16 @@ export default function BetPage() {
     setMessage(null);
     setError(null);
 
-    // validate common
     if (!selectedGroup) return setError('Select a group first');
     if (!gameId.trim()) return setError('Game ID is required');
 
-    // amount
+    // amount — free-typing, digits only
     if (amountCents.trim() === '') return setError('Amount (cents) is required');
     const amt = parseInt(amountCents, 10);
     if (Number.isNaN(amt) || amt <= 0) return setError('Amount (cents) must be a positive integer');
 
     if (Number.isNaN(odds) || odds <= 1.0) return setError('Odds must be > 1.0');
 
-    // build details + pick depending on market
     let details: Record<string, any> | undefined;
     let submitPick = pick; // default
 
@@ -141,7 +145,14 @@ export default function BetPage() {
         const pts = Number(spreadPoints);
         if (Number.isNaN(pts)) return setError('Enter a valid spread (e.g., -3.5)');
         details = { spreadPoints: pts };
-        // pick is HOME/AWAY (team taking spread)
+        // submitPick: HOME/AWAY
+        break;
+      }
+      case 'TOTALS': {
+        const lineNum = parseFloat(totalsLine);
+        if (Number.isNaN(lineNum)) return setError('Totals line must be a number');
+        details = { totalLine: lineNum };
+        submitPick = totalsDirection; // OVER or UNDER
         break;
       }
       case 'PLAYER_PROP': {
@@ -154,7 +165,7 @@ export default function BetPage() {
           line: lineNum,
           direction: ppDirection,
         };
-        submitPick = ppDirection; // e.g., OVER or UNDER
+        submitPick = ppDirection; // OVER/UNDER
         break;
       }
       case 'TEAM_PROP': {
@@ -167,31 +178,25 @@ export default function BetPage() {
           line: lineNum,
           direction: tpDirection,
         };
-        submitPick = tpTeam; // team in pick; direction in details
+        submitPick = tpTeam; // HOME/AWAY (direction in details)
         break;
       }
       case 'SAME_GAME': {
-        const legs = sgpLegs
-          .split('\n')
-          .map(s => s.trim())
-          .filter(Boolean);
+        const legs = sgpLegs.split('\n').map(s => s.trim()).filter(Boolean);
         if (legs.length === 0) return setError('Add at least one SGP leg (one per line)');
         details = { legs };
         submitPick = 'SGP';
         break;
       }
       case 'PARLAY': {
-        const legs = parlayLegs
-          .split('\n')
-          .map(s => s.trim())
-          .filter(Boolean);
+        const legs = parlayLegs.split('\n').map(s => s.trim()).filter(Boolean);
         if (legs.length === 0) return setError('Add at least one Parlay leg (one per line)');
         details = { legs };
         submitPick = 'PARLAY';
         break;
       }
       default:
-        // WINNER / TOTALS (if you wire it later)
+        // WINNER — no extra details; pick stays HOME/AWAY
         break;
     }
 
@@ -207,7 +212,6 @@ export default function BetPage() {
         details
       );
       setMessage('Bet proposed!');
-      // reset some fields
       setAmountCents('');
       setOdds(1.8);
       resetMarketSpecificFields();
@@ -229,10 +233,9 @@ export default function BetPage() {
     }
   }
 
-  // --- UI helpers ------------------------------------------------------------
-
+  // Dynamic fields per market (left panel untouched)
   function renderProposeFields() {
-    // Common across all markets
+    // Common tail
     const commonEnd = (
       <>
         <TextField
@@ -243,7 +246,6 @@ export default function BetPage() {
           inputProps={{ step: '0.01', min: 1.01 }}
           required
         />
-        {/* free-typing, digit-only sanitization */}
         <TextField
           label="Amount (cents)"
           type="text"
@@ -256,7 +258,6 @@ export default function BetPage() {
       </>
     );
 
-    // Market-specific inputs
     switch (marketType) {
       case 'WINNER':
         return (
@@ -312,6 +313,38 @@ export default function BetPage() {
               inputProps={{ inputMode: 'decimal' }}
               required
             />
+            {commonEnd}
+          </>
+        );
+
+      case 'TOTALS':
+        return (
+          <>
+            <TextField
+              label="Game ID"
+              value={gameId}
+              onChange={e => setGameId(e.target.value)}
+              required
+            />
+            <TextField
+              label="Totals Line (e.g., 210.5)"
+              value={totalsLine}
+              onChange={e => setTotalsLine(e.target.value)}
+              inputProps={{ inputMode: 'decimal' }}
+              required
+            />
+            <FormControl>
+              <InputLabel id="totals-dir">Direction</InputLabel>
+              <Select
+                labelId="totals-dir"
+                label="Direction"
+                value={totalsDirection}
+                onChange={e => setTotalsDirection(e.target.value as 'OVER' | 'UNDER')}
+              >
+                <MenuItem value="OVER">OVER</MenuItem>
+                <MenuItem value="UNDER">UNDER</MenuItem>
+              </Select>
+            </FormControl>
             {commonEnd}
           </>
         );
@@ -465,27 +498,21 @@ export default function BetPage() {
         );
 
       default:
-        return (
-          <>
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            {commonEnd}
-          </>
-        );
+        return null;
     }
   }
 
   function renderBetRow(b: Bet) {
     const isOpen = b.status === 'OPEN';
     const sp = (b as any).details?.spreadPoints;
-    const pickLabel =
-      b.marketType === 'SPREAD' && typeof sp === 'number'
-        ? `${b.pick} ${sp > 0 ? `+${sp}` : sp}`
-        : b.pick;
+    const total = (b as any).details?.totalLine;
+
+    let pickLabel = b.pick;
+    if (b.marketType === 'SPREAD' && typeof sp === 'number') {
+      pickLabel = `${b.pick} ${sp > 0 ? `+${sp}` : sp}`;
+    } else if (b.marketType === 'TOTALS' && typeof total === 'number') {
+      pickLabel = `${b.pick} ${total}`; // OVER 210.5 / UNDER 210.5
+    }
 
     return (
       <ListItem key={b.id} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -501,8 +528,6 @@ export default function BetPage() {
       </ListItem>
     );
   }
-
-  // --- Render ----------------------------------------------------------------
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 2, mt: 4 }}>
@@ -594,17 +619,16 @@ export default function BetPage() {
                     setMarketType(e.target.value as MarketType);
                     setMessage(null);
                     setError(null);
-                    // clear market-specific fields when switching
                     resetMarketSpecificFields();
                   }}
                 >
                   <MenuItem value="WINNER">Moneyline (WINNER)</MenuItem>
                   <MenuItem value="SPREAD">Spread</MenuItem>
+                  <MenuItem value="TOTALS">Totals (O/U)</MenuItem>
                   <MenuItem value="PLAYER_PROP">Player Prop</MenuItem>
                   <MenuItem value="TEAM_PROP">Team Prop</MenuItem>
                   <MenuItem value="SAME_GAME">Same Game (SGP)</MenuItem>
                   <MenuItem value="PARLAY">Parlay</MenuItem>
-                  {/* hook for TOTALS later */}
                 </Select>
               </FormControl>
 
