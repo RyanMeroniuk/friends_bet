@@ -35,7 +35,14 @@ public class SecurityConfig {
                                 "/api/users/register",
                                 "/api/users/login",
                                 "/ping",
-                                "/h2-console/**"
+                                "/h2-console/**",
+                                "/api/sports",
+                                "/api/sports/*/games",
+                                "/api/games/upcoming",
+                                "/api/games/*/markets",
+                                "/api/sports/**",
+                                "/api/games/**",
+                                "/api/admin/**"
                         ).permitAll()
 
                         .requestMatchers("/api/**").authenticated()

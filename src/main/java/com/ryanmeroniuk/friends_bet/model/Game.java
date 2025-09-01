@@ -7,20 +7,24 @@ import java.util.UUID;
 @Entity
 @Table(name = "games")
 public class Game {
-    @Id @GeneratedValue
+    @Id
+    @GeneratedValue
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "external_game_id", nullable = false, unique = true)
     private String externalGameId;
 
-    @Column(nullable = false)
+    @Column(name = "home_team", nullable = false)
     private String homeTeam;
 
-    @Column(nullable = false)
+    @Column(name = "away_team", nullable = false)
     private String awayTeam;
 
-    @Column(nullable = false)
+    @Column(name = "start_time", nullable = false)
     private Instant startTime;
+
+    @Column(name = "sport")
+    private String sport;
 
     public Game() {}
 
@@ -31,43 +35,21 @@ public class Game {
         this.startTime = startTime;
     }
 
-    public UUID getId() {
-        return id;
-    }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
+    public String getExternalGameId() { return externalGameId; }
+    public void setExternalGameId(String externalGameId) { this.externalGameId = externalGameId; }
 
-    public String getExternalGameId() {
-        return externalGameId;
-    }
+    public String getHomeTeam() { return homeTeam; }
+    public void setHomeTeam(String homeTeam) { this.homeTeam = homeTeam; }
 
-    public void setExternalGameId(String externalGameId) {
-        this.externalGameId = externalGameId;
-    }
+    public String getAwayTeam() { return awayTeam; }
+    public void setAwayTeam(String awayTeam) { this.awayTeam = awayTeam; }
 
-    public String getHomeTeam() {
-        return homeTeam;
-    }
+    public Instant getStartTime() { return startTime; }
+    public void setStartTime(Instant startTime) { this.startTime = startTime; }
 
-    public void setHomeTeam(String homeTeam) {
-        this.homeTeam = homeTeam;
-    }
-
-    public String getAwayTeam() {
-        return awayTeam;
-    }
-
-    public void setAwayTeam(String awayTeam) {
-        this.awayTeam = awayTeam;
-    }
-
-    public Instant getStartTime() {
-        return startTime;
-    }
-
-    public void setStartTime(Instant startTime) {
-        this.startTime = startTime;
-    }
+    public String getSport() { return sport; }
+    public void setSport(String sport) { this.sport = sport; }
 }

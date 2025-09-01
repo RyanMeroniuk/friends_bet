@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { listMyGroups, GroupResponse } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
+import { listGames, GameSummary } from '../api/game';
 import {
   Box,
   Typography,
@@ -24,6 +25,14 @@ type MarketType =
   | 'TEAM_PROP'
   | 'SAME_GAME'
   | 'PARLAY';
+
+const DAYS_WINDOW = 2; // next 2 days per backend endpoints
+const API_BASE = (process.env.REACT_APP_API_BASE || '').replace(/\/$/, '');
+function authToken() {
+  try { return JSON.parse(localStorage.getItem('authUser') || '{}')?.token; }
+  catch { return undefined; }
+}
+
 
 export default function BetPage() {
   // groups + selection (left panel unchanged)
@@ -63,13 +72,22 @@ export default function BetPage() {
   const [tpLine, setTpLine] = useState<string>('');
   const [tpDirection, setTpDirection] = useState<'OVER' | 'UNDER'>('OVER');
 
-  // SAME_GAME
+  // SAME_GAME / PARLAY
   const [sgpLegs, setSgpLegs] = useState<string>('');
-
-  // PARLAY
   const [parlayLegs, setParlayLegs] = useState<string>('');
 
-  // styles for left list
+  // sports + games (NEW)
+  const [sports, setSports] = useState<string[]>([]);
+  const [selectedSport, setSelectedSport] = useState<string>('');
+  const [sportsError, setSportsError] = useState<string | null>(null);
+
+  // games
+  const [games, setGames] = useState<GameSummary[]>([]);
+  const selectedGame = useMemo(
+    () => games.find(g => g.id === gameId),
+    [games, gameId]
+  );
+
   const listItem = (active: boolean): React.CSSProperties => ({
     padding: '0.55rem 0.65rem',
     borderRadius: 6,
@@ -79,7 +97,7 @@ export default function BetPage() {
     marginBottom: 6,
   });
 
-  // load my groups
+  // ------- load groups (unchanged) -------
   useEffect(() => {
     const auth = JSON.parse(localStorage.getItem('authUser')!);
     listMyGroups(auth.id)
@@ -90,12 +108,92 @@ export default function BetPage() {
       .catch(() => setError('Could not load your groups'));
   }, []);
 
-  // load bets on group change
+  // ------- load bets when group changes (unchanged) -------
   useEffect(() => {
     if (!selectedGroup) return;
     loadBets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroup]);
+
+  // ------- NEW: load sports (next 2 days) -------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setSportsError(null);
+      try {
+        const token = authToken();
+        const res = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const list: string[] = await res.json();
+        if (!cancelled) {
+          setSports(list || []);
+          if (!selectedSport && list?.length) setSelectedSport(list[0]);
+        }
+      } catch (e) {
+        if (!cancelled) setSportsError('Could not load sports');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+
+  // ------- NEW: load games whenever sport changes -------
+  useEffect(() => {
+    if (!selectedSport) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = authToken();
+        const res = await fetch(
+          `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
+          {
+            headers: {
+              Accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }
+        );
+        if (!res.ok) throw new Error(await res.text());
+        const list: any[] = await res.json();
+        const mapped: GameSummary[] = (list || []).map((g: any) => ({
+          id: g.id,
+          homeTeam: g.homeTeam,
+          awayTeam: g.awayTeam,
+          startTime: g.startTime,
+        }));
+        if (!cancelled) {
+          setGames(mapped);
+          if (mapped.length > 0) {
+            setGameId(prev => prev || mapped[0].id);
+          } else {
+            setGameId('');
+          }
+        }
+      } catch {
+        // keep silent; manual Game ID still works
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedSport]);
+
+
+  // ------- existing: initial listGames fallback (kept) -------
+  useEffect(() => {
+    // If sport picker hasn’t selected anything yet, keep your legacy loader
+    if (selectedSport) return;
+    (async () => {
+      try {
+        const list = await listGames();
+        setGames(list);
+      } catch (e) {
+        console.warn('Failed to load games', e);
+      }
+    })();
+  }, [selectedSport]);
 
   async function loadBets() {
     try {
@@ -123,6 +221,65 @@ export default function BetPage() {
     setParlayLegs('');
   }
 
+  // ---------- Prefill from selected game/odds ----------
+  function round2(n: number) {
+    return Math.round(n * 100) / 100;
+  }
+
+  function prefillFromGame(game: GameSummary | undefined, market: MarketType) {
+    if (!game) return;
+
+    const o = (game as any).odds || {};
+    switch (market) {
+      case 'WINNER': {
+        setPick('HOME');
+        const homeOdds = o.h2h?.home;
+        if (typeof homeOdds === 'number' && homeOdds > 1) {
+          setOdds(round2(homeOdds));
+        }
+        break;
+      }
+      case 'SPREAD': {
+        setPick('HOME');
+        if (typeof o.spreads?.lineHome === 'number') {
+          setSpreadPoints(String(o.spreads.lineHome));
+        }
+        if (typeof o.spreads?.oddsHome === 'number' && o.spreads.oddsHome > 1) {
+          setOdds(round2(o.spreads.oddsHome));
+        }
+        break;
+      }
+      case 'TOTALS': {
+        setTotalsDirection('OVER');
+        if (typeof o.totals?.line === 'number') {
+          setTotalsLine(String(o.totals.line));
+        }
+        if (typeof o.totals?.over === 'number' && o.totals.over > 1) {
+          setOdds(round2(o.totals.over));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  // when you change game, prefill fields for current market
+  function handlePickGame(newGameId: string) {
+    setGameId(newGameId);
+    const g = games.find(x => x.id === newGameId);
+    prefillFromGame(g, marketType);
+  }
+
+  // when you change market, re-apply prefill if a game is selected
+  function handleMarketChange(next: MarketType) {
+    setMarketType(next);
+    setMessage(null);
+    setError(null);
+    resetMarketSpecificFields();
+    if (selectedGame) prefillFromGame(selectedGame, next);
+  }
+
   async function onPropose() {
     setMessage(null);
     setError(null);
@@ -145,14 +302,13 @@ export default function BetPage() {
         const pts = Number(spreadPoints);
         if (Number.isNaN(pts)) return setError('Enter a valid spread (e.g., -3.5)');
         details = { spreadPoints: pts };
-        // submitPick: HOME/AWAY
         break;
       }
       case 'TOTALS': {
         const lineNum = parseFloat(totalsLine);
         if (Number.isNaN(lineNum)) return setError('Totals line must be a number');
         details = { totalLine: lineNum };
-        submitPick = totalsDirection; // OVER or UNDER
+        submitPick = totalsDirection; // OVER/UNDER
         break;
       }
       case 'PLAYER_PROP': {
@@ -165,7 +321,7 @@ export default function BetPage() {
           line: lineNum,
           direction: ppDirection,
         };
-        submitPick = ppDirection; // OVER/UNDER
+        submitPick = ppDirection;
         break;
       }
       case 'TEAM_PROP': {
@@ -178,7 +334,7 @@ export default function BetPage() {
           line: lineNum,
           direction: tpDirection,
         };
-        submitPick = tpTeam; // HOME/AWAY (direction in details)
+        submitPick = tpTeam; // HOME/AWAY
         break;
       }
       case 'SAME_GAME': {
@@ -196,8 +352,7 @@ export default function BetPage() {
         break;
       }
       default:
-        // WINNER — no extra details; pick stays HOME/AWAY
-        break;
+        break; // WINNER
     }
 
     try {
@@ -233,9 +388,50 @@ export default function BetPage() {
     }
   }
 
+  // Reusable picker block (sport + game dropdowns)
+  function SportGamePickers() {
+    return (
+      <>
+        <FormControl>
+          <InputLabel id="sport-picker">Sport</InputLabel>
+          <Select
+            labelId="sport-picker"
+            label="Sport"
+            value={selectedSport}
+            onChange={e => setSelectedSport(String(e.target.value))}
+            displayEmpty
+          >
+            {sports.length === 0 && <MenuItem value=""><em>No sports</em></MenuItem>}
+            {sports.map(s => (
+              <MenuItem key={s} value={s}>{s}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl>
+          <InputLabel id="game-picker">Pick Game</InputLabel>
+          <Select
+            labelId="game-picker"
+            label="Pick Game"
+            value={gameId}
+            onChange={e => handlePickGame(String(e.target.value))}
+            displayEmpty
+          >
+            {games.map(g => (
+              <MenuItem key={g.id} value={g.id}>
+                {g.homeTeam} vs {g.awayTeam} — {new Date(g.startTime).toLocaleString()}
+              </MenuItem>
+            ))}
+            {/* Leave empty list as-is; user can still type Game ID manually below */}
+          </Select>
+        </FormControl>
+      </>
+    );
+  }
+
   // Dynamic fields per market (left panel untouched)
   function renderProposeFields() {
-    // Common tail
+    // Common tail (keeps your free-typing amount box)
     const commonEnd = (
       <>
         <TextField
@@ -262,6 +458,10 @@ export default function BetPage() {
       case 'WINNER':
         return (
           <>
+            {/* NEW: Sport + Game pickers */}
+            <SportGamePickers />
+
+            {/* still allow manual override */}
             <TextField
               label="Game ID"
               value={gameId}
@@ -287,6 +487,8 @@ export default function BetPage() {
       case 'SPREAD':
         return (
           <>
+            <SportGamePickers />
+
             <TextField
               label="Game ID"
               value={gameId}
@@ -320,6 +522,8 @@ export default function BetPage() {
       case 'TOTALS':
         return (
           <>
+            <SportGamePickers />
+
             <TextField
               label="Game ID"
               value={gameId}
@@ -575,6 +779,11 @@ export default function BetPage() {
             Propose a Bet
           </Typography>
 
+          {sportsError && (
+            <Typography color="error" sx={{ mb: 1 }}>
+              {sportsError}
+            </Typography>
+          )}
           {error && (
             <Typography color="error" sx={{ mb: 2 }}>
               {error}
@@ -615,12 +824,7 @@ export default function BetPage() {
                   labelId="market-label"
                   label="Market"
                   value={marketType}
-                  onChange={e => {
-                    setMarketType(e.target.value as MarketType);
-                    setMessage(null);
-                    setError(null);
-                    resetMarketSpecificFields();
-                  }}
+                  onChange={e => handleMarketChange(e.target.value as MarketType)}
                 >
                   <MenuItem value="WINNER">Moneyline (WINNER)</MenuItem>
                   <MenuItem value="SPREAD">Spread</MenuItem>

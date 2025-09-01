@@ -6,3 +6,14 @@ spring:
 jwt:
   secret: s4qr0OiO8Jfxsj1nAAcYVRWxPKgIfucQExCfFIrMzN0=
   expiration-ms: 3600000
+
+odds:
+  source: theoddsapi
+  apiKey: ${ODDS_API_KEY}
+  regions: us
+  markets: [h2h, spreads, totals]
+  sport:
+    nba: basketball_nba
+    nfl: americanfootball_nfl
+  refreshMillis: 180000
+
