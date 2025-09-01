@@ -42,7 +42,8 @@ public class SecurityConfig {
                                 "/api/games/*/markets",
                                 "/api/sports/**",
                                 "/api/games/**",
-                                "/api/admin/**"
+                                "/api/admin/**",
+                                "/actuator/**"
                         ).permitAll()
 
                         .requestMatchers("/api/**").authenticated()

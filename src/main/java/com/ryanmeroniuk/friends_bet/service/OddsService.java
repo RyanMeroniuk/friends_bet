@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -26,8 +28,13 @@ public class OddsService {
     @Value("${odds.source:theoddsapi}")
     private String source;
 
+    /** Legacy single-sport fallback (kept for compatibility). */
     @Value("${odds.sport.nba:basketball_nba}")
     private String nbaSportKey;
+
+    /** NEW: comma-separated list of sport keys to refresh (e.g. baseball_mlb,basketball_nba,icehockey_nhl). */
+    @Value("${odds.sportKeys:}")
+    private String configuredSportKeys;
 
     public OddsService(TheOddsApiClient client,
                        GameRepository gameRepo,
@@ -35,6 +42,18 @@ public class OddsService {
         this.client = client;
         this.gameRepo = gameRepo;
         this.quoteRepo = quoteRepo;
+    }
+
+    /** Parse the configured comma-separated list into a clean List. */
+    private List<String> sportKeys() {
+        if (configuredSportKeys == null || configuredSportKeys.isBlank()) return List.of();
+        String[] parts = configuredSportKeys.split(",");
+        List<String> out = new ArrayList<>(parts.length);
+        for (String p : parts) {
+            String s = p.trim();
+            if (!s.isEmpty()) out.add(s);
+        }
+        return out;
     }
 
     /** Manual trigger to refresh a sport key (e.g., NBA). */
@@ -73,10 +92,27 @@ public class OddsService {
         }
     }
 
-    /** Periodic NBA pull (adjust or add more leagues as needed). */
+    /** NEW: refresh all configured sports (ignores failures of individual sports). */
+    public void refreshAll() {
+        List<String> keys = sportKeys();
+        if (keys.isEmpty()) {
+            // fallback to legacy single-sport if none configured
+            refreshForSport(nbaSportKey);
+            return;
+        }
+        for (String key : keys) {
+            try {
+                refreshForSport(key);
+            } catch (Exception e) {
+                System.err.println("Refresh failed for sport " + key + ": " + e.getMessage());
+            }
+        }
+    }
+
+    /** Scheduled pull: refresh ALL configured sports (or NBA fallback). */
     @Scheduled(fixedDelayString = "${odds.refreshMillis:180000}")
-    public void scheduledNbaRefresh() {
-        refreshForSport(nbaSportKey);
+    public void scheduledRefresh() {
+        refreshAll();
     }
 
     /* ===================== Helpers ===================== */

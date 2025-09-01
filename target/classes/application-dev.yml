@@ -12,3 +12,15 @@ spring:
     enabled: true
     baseline-on-migrate: true
     schemas: public
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env
+  endpoint:
+    env:
+      show-values: ALWAYS
+odds:
+  sportKeys: baseball_mlb,basketball_nba,icehockey_nhl,americanfootball_nfl
+  refreshMillis: 180000
+
