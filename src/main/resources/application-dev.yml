@@ -23,4 +23,8 @@ management:
 odds:
   sportKeys: baseball_mlb,basketball_nba,icehockey_nhl,americanfootball_nfl
   refreshMillis: 180000
+scores:
+  refreshMillis: 60000
+  daysFrom: 3
+
 

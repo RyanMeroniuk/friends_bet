@@ -10,4 +10,6 @@ public interface BetRepository extends JpaRepository<Bet, UUID> {
     List<Bet> findAllByGroupId(UUID groupId);
     List<Bet> findAllByStatus(String status);
     List<Bet> findAllByGroupIdAndStatus(UUID groupId, String status);
+    List<Bet> findByGameId(UUID gameId);
+
 }

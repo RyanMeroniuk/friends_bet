@@ -1,13 +1,20 @@
 package com.ryanmeroniuk.friends_bet.service;
 
-import com.ryanmeroniuk.friends_bet.dto.*;
+import com.ryanmeroniuk.friends_bet.dto.AcceptBetRequest;
+import com.ryanmeroniuk.friends_bet.dto.BetMapper;
+import com.ryanmeroniuk.friends_bet.dto.BetResponse;
+import com.ryanmeroniuk.friends_bet.dto.CreateBetRequest;
+import com.ryanmeroniuk.friends_bet.dto.WalletDepositRequest;
 import com.ryanmeroniuk.friends_bet.model.Bet;
 import com.ryanmeroniuk.friends_bet.model.Game;
-import com.ryanmeroniuk.friends_bet.repository.*;
-import org.springframework.scheduling.annotation.Scheduled;
+import com.ryanmeroniuk.friends_bet.repository.BetRepository;
+import com.ryanmeroniuk.friends_bet.repository.GameRepository;
+import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
+import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
+import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -41,7 +48,6 @@ public class BetService {
         this.groupMemberRepo = groupMemberRepo;
     }
 
-    /** Propose a new bet: escrow proposer only. */
     /** Propose a new bet: escrow proposer only. */
     @Transactional
     public BetResponse propose(CreateBetRequest req) {
@@ -144,10 +150,6 @@ public class BetService {
         long proposerStake = bet.getAmountCents();
         long acceptorStake = calcAcceptorStake(proposerStake, bet.getOdds());
 
-        // Ensure funds & escrow acceptor stake (debit)
-        // See note above re: enforcing inside WalletService.deposit(...)
-        // walletService.ensureSufficientBalance(bet.getGroupId(), actor, acceptorStake);
-
         walletService.deposit(
                 bet.getGroupId(),
                 new WalletDepositRequest(actor, -acceptorStake)
@@ -161,7 +163,6 @@ public class BetService {
         return BetMapper.toResponse(updated);
     }
 
-
     /** List all bets for a group. */
     public List<BetResponse> listByGroup(UUID groupId) {
         groupRepo.findById(groupId)
@@ -169,39 +170,7 @@ public class BetService {
         return BetMapper.toResponse(betRepo.findAllByGroupId(groupId));
     }
 
-    /** Settle accepted bets whose games have started (stub rule). */
-    @Scheduled(fixedRate = 60_000)
-    @Transactional
-    public void settleBets() {
-        Instant now = Instant.now();
-        List<Bet> accepted = betRepo.findAll().stream()
-                .filter(b -> "ACCEPTED".equals(b.getStatus()))
-                .toList();
-
-        for (Bet b : accepted) {
-            // Only settle if game start is in the past
-            Game g = gameRepo.findById(b.getGameId()).orElse(null);
-            if (g == null || g.getStartTime() == null || g.getStartTime().isAfter(now)) {
-                continue;
-            }
-
-            UUID winnerId = determineWinner(b);
-            if (winnerId == null) {
-                // VOID – refund both stakes
-                walletService.deposit(b.getGroupId(), new WalletDepositRequest(b.getProposerId(), b.getAmountCents()));
-                walletService.deposit(b.getGroupId(), new WalletDepositRequest(b.getAcceptorId(), b.getAcceptorStakeCents()));
-                b.setStatus("VOID");
-            } else {
-                long pool = b.getAmountCents() + b.getAcceptorStakeCents();
-                walletService.deposit(b.getGroupId(), new WalletDepositRequest(winnerId, pool));
-                b.setStatus("RESOLVED");
-            }
-            b.setResolvedAt(now);
-            betRepo.save(b);
-        }
-    }
-
-
+    // ---------- Helpers ----------
 
     private static long calcAcceptorStake(long proposerStake, double odds) {
         // acceptorStake = round( A * (odds - 1) )
@@ -225,17 +194,10 @@ public class BetService {
         };
     }
 
-    /** TEMP stub; replace with real result lookup */
-    private UUID determineWinner(Bet bet) {
-        if (bet.getAcceptorId() == null) return bet.getProposerId();
-        return Math.random() < 0.5 ? bet.getProposerId() : bet.getAcceptorId();
-    }
-
     private UUID currentUserId() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepo.findByUsername(username)
                 .map(u -> u.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Auth user not found"));
     }
-
 }

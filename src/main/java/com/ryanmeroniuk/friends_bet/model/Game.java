@@ -7,6 +7,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "games")
 public class Game {
+
     @Id
     @GeneratedValue
     private UUID id;
@@ -26,6 +27,26 @@ public class Game {
     @Column(name = "sport")
     private String sport;
 
+    // ==== NEW: fields used for settlement ====
+
+    /** Final home team score (nullable until game ends). */
+    @Column(name = "home_score")
+    private Integer homeScore;
+
+    /** Final away team score (nullable until game ends). */
+    @Column(name = "away_score")
+    private Integer awayScore;
+
+    /** True once the game has a final score and bets may be settled. */
+    @Column(name = "is_final", nullable = false)
+    private boolean isFinal = false;
+
+    /** When we marked this game final. */
+    @Column(name = "final_at")
+    private Instant finalAt;
+
+    // ==== constructors ====
+
     public Game() {}
 
     public Game(String externalGameId, String homeTeam, String awayTeam, Instant startTime) {
@@ -34,6 +55,8 @@ public class Game {
         this.awayTeam = awayTeam;
         this.startTime = startTime;
     }
+
+    // ==== getters / setters ====
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -52,4 +75,16 @@ public class Game {
 
     public String getSport() { return sport; }
     public void setSport(String sport) { this.sport = sport; }
+
+    public Integer getHomeScore() { return homeScore; }
+    public void setHomeScore(Integer homeScore) { this.homeScore = homeScore; }
+
+    public Integer getAwayScore() { return awayScore; }
+    public void setAwayScore(Integer awayScore) { this.awayScore = awayScore; }
+
+    public boolean isFinal() { return isFinal; }
+    public void setFinal(boolean aFinal) { isFinal = aFinal; }
+
+    public Instant getFinalAt() { return finalAt; }
+    public void setFinalAt(Instant finalAt) { this.finalAt = finalAt; }
 }

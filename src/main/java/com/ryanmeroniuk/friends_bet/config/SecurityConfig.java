@@ -43,7 +43,8 @@ public class SecurityConfig {
                                 "/api/sports/**",
                                 "/api/games/**",
                                 "/api/admin/**",
-                                "/actuator/**"
+                                "/actuator/**",
+                                "/api/admin/games/**"
                         ).permitAll()
 
                         .requestMatchers("/api/**").authenticated()
