@@ -25,33 +25,31 @@ public class AdminController {
         this.settlement = settlement;
     }
 
-    /** Button 1: refresh odds/games for one sport or all */
+    /** Button 1: refresh odds/games for betting */
     @PostMapping("/refresh")
-    public ResponseEntity<?> refreshOdds(@RequestParam(defaultValue = "all") String sport) {
-        if ("all".equalsIgnoreCase(sport)) {
-            odds.refreshAll();
-        } else {
-            odds.refreshForSport(sport);
-        }
-        return ResponseEntity.ok(Map.of("status", "ok", "sport", sport));
+    public ResponseEntity<Map<String, Object>> refresh(@RequestParam(defaultValue = "all") String sport) {
+        if ("all".equalsIgnoreCase(sport)) odds.refreshAll();
+        else odds.refreshForSport(sport);
+        return ResponseEntity.ok(Map.of("status", "ok", "refreshed", sport));
     }
 
-    /** Button 2: refresh scores & settle completed games (one sport or all) */
+    /** Button 2: settle all completed games (pull scores on demand) */
     @PostMapping("/scores/refresh")
-    public ResponseEntity<?> refreshScores(@RequestParam(defaultValue = "all") String sport) {
-        if ("all".equalsIgnoreCase(sport)) {
-            scoreSync.refreshScoresAll();
-        } else {
-            scoreSync.refreshScoresForSport(sport);
-        }
-        return ResponseEntity.ok(Map.of("status", "ok", "sport", sport));
+    public ResponseEntity<ScoreSyncService.ScoreSyncSummary> refreshScores(
+            @RequestParam(defaultValue = "all") String sport,
+            @RequestParam(required = false) Integer daysFrom
+    ) {
+        var summary = scoreSync.refreshScores(sport, daysFrom);
+        return ResponseEntity.ok(summary);
     }
 
-    /** Manual override: mark specific game final with explicit scores */
+    /** Manual override: finalize a specific game with explicit scores */
     @PostMapping("/games/{gameId}/final")
-    public ResponseEntity<?> finalizeGame(@PathVariable UUID gameId,
-                                          @RequestParam int homeScore,
-                                          @RequestParam int awayScore) {
+    public ResponseEntity<Map<String, Object>> finalizeGame(
+            @PathVariable UUID gameId,
+            @RequestParam("homeScore") int homeScore,
+            @RequestParam("awayScore") int awayScore
+    ) {
         int settled = settlement.setFinalScore(gameId, homeScore, awayScore);
         return ResponseEntity.ok(Map.of(
                 "gameId", gameId,
@@ -61,9 +59,9 @@ public class AdminController {
         ));
     }
 
-    /** Re-run settlement for a game already marked final */
+    /** Manual re-run of settlement for an already-final game */
     @PostMapping("/games/{gameId}/settle")
-    public ResponseEntity<?> settle(@PathVariable UUID gameId) {
+    public ResponseEntity<Map<String, Object>> settle(@PathVariable UUID gameId) {
         int settled = settlement.settleGame(gameId);
         return ResponseEntity.ok(Map.of("gameId", gameId, "settledBets", settled));
     }
