@@ -22,9 +22,14 @@ export default function GroupPage() {
   const { groupId, setGroupId } = useGroup();
   const navigate = useNavigate();
 
-  // current user (same as your existing logic)
+
   const auth = JSON.parse(localStorage.getItem('authUser') || '{}');
   const currentUserId: string = auth.id;
+
+
+  useEffect(() => {
+    setJoinUserId(currentUserId || '');
+  }, [currentUserId]);
 
   // load my groups on mount
   useEffect(() => {
@@ -108,7 +113,7 @@ export default function GroupPage() {
     try {
       const grp = await joinGroup(inviteCode.trim(), joinUserId.trim() || currentUserId);
       setInviteCode('');
-      setJoinUserId('');
+      setJoinUserId(currentUserId || ''); // keep prefilled after join
       setMessage('Successfully joined group!');
       await reloadGroupsAndStay();
       setGroupId(grp.id);
