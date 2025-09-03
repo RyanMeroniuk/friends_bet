@@ -33,7 +33,6 @@ function authToken() {
   catch { return undefined; }
 }
 
-
 export default function BetPage() {
   // groups + selection (left panel unchanged)
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -88,6 +87,10 @@ export default function BetPage() {
     [games, gameId]
   );
 
+  // ---- NEW: admin action buttons loading flags
+  const [busyRefresh, setBusyRefresh] = useState(false);
+  const [busySettle, setBusySettle] = useState(false);
+
   const listItem = (active: boolean): React.CSSProperties => ({
     padding: '0.55rem 0.65rem',
     borderRadius: 6,
@@ -140,7 +143,6 @@ export default function BetPage() {
     return () => { cancelled = true; };
   }, []);
 
-
   // ------- NEW: load games whenever sport changes -------
   useEffect(() => {
     if (!selectedSport) return;
@@ -179,7 +181,6 @@ export default function BetPage() {
     })();
     return () => { cancelled = true; };
   }, [selectedSport]);
-
 
   // ------- existing: initial listGames fallback (kept) -------
   useEffect(() => {
@@ -338,7 +339,7 @@ export default function BetPage() {
         break;
       }
       case 'SAME_GAME': {
-        const legs = sgpLegs.split('\n').map(s => s.trim()).filter(Boolean);
+        const legs = parlayLegs.split('\n').map(s => s.trim()).filter(Boolean);
         if (legs.length === 0) return setError('Add at least one SGP leg (one per line)');
         details = { legs };
         submitPick = 'SGP';
@@ -388,6 +389,106 @@ export default function BetPage() {
     }
   }
 
+  // ---- NEW: Admin actions (two buttons) ----
+  async function refreshOddsAndGames() {
+    try {
+      setBusyRefresh(true);
+      setMessage(null);
+      setError(null);
+      const token = authToken();
+
+      // 1) tell backend to refresh odds/sports/games
+      const res = await fetch(`${API_BASE}/api/admin/refresh?sport=all`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      // 2) re-pull sports list, then games for selectedSport
+      const resSports = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (resSports.ok) {
+        const list: string[] = await resSports.json();
+        setSports(list || []);
+        if (!selectedSport && list?.length) {
+          setSelectedSport(list[0]);
+        }
+      }
+      if (selectedSport) {
+        const resGames = await fetch(
+          `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
+          {
+            headers: {
+              Accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }
+        );
+        if (resGames.ok) {
+          const list: any[] = await resGames.json();
+          const mapped: GameSummary[] = (list || []).map((g: any) => ({
+            id: g.id,
+            homeTeam: g.homeTeam,
+            awayTeam: g.awayTeam,
+            startTime: g.startTime,
+          }));
+          setGames(mapped);
+          if (mapped.length > 0) setGameId(prev => prev || mapped[0].id);
+        }
+      }
+
+      setMessage('Sports & games refreshed.');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to refresh sports/games');
+    } finally {
+      setBusyRefresh(false);
+    }
+  }
+
+  async function settleAcceptedBets() {
+    try {
+      setBusySettle(true);
+      setMessage(null);
+      setError(null);
+      const token = authToken();
+
+      // Prefer new endpoint
+      let res = await fetch(`${API_BASE}/api/admin/scores/refresh?sport=all`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      // Fallback to older name if needed
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${API_BASE}/api/admin/sync-scores`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+      }
+      if (!res.ok) throw new Error(await res.text());
+
+      await loadBets(); // reflect any settlements
+      setMessage('Settlement check complete.');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to settle accepted bets');
+    } finally {
+      setBusySettle(false);
+    }
+  }
+
   // Reusable picker block (sport + game dropdowns)
   function SportGamePickers() {
     return (
@@ -410,7 +511,7 @@ export default function BetPage() {
 
         <FormControl>
           <InputLabel id="game-picker">Pick Game</InputLabel>
-          <Select
+        <Select
             labelId="game-picker"
             label="Pick Game"
             value={gameId}
@@ -757,6 +858,24 @@ export default function BetPage() {
 
       {/* RIGHT: stacked panels */}
       <Box sx={{ display: 'grid', gap: 2 }}>
+        {/* NEW: Admin toolbar */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={refreshOddsAndGames}
+            disabled={busyRefresh}
+          >
+            {busyRefresh ? 'Refreshing…' : 'Refresh Sports & Games'}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={settleAcceptedBets}
+            disabled={busySettle}
+          >
+            {busySettle ? 'Settling…' : 'Settle Accepted Bets'}
+          </Button>
+        </Box>
+
         {/* Top: Unsettled bets */}
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom>
