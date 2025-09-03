@@ -86,15 +86,6 @@ public class ScoreSyncService {
         }
     }
 
-    /* ---------- Scheduler ---------- */
-
-    @Scheduled(fixedDelayString = "${scores.refreshMillis:60000}")
-    public void syncScores() {
-        refreshScoresAll();
-    }
-
-    /* ---------- Helpers ---------- */
-
     private List<String> sportKeys() {
         if (configuredSportKeys == null || configuredSportKeys.isBlank()) return List.of();
         String[] parts = configuredSportKeys.split(",");

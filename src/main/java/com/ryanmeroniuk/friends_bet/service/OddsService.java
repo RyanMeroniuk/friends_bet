@@ -109,14 +109,6 @@ public class OddsService {
         }
     }
 
-    /** Scheduled pull: refresh ALL configured sports (or NBA fallback). */
-    @Scheduled(fixedDelayString = "${odds.refreshMillis:180000}")
-    public void scheduledRefresh() {
-        refreshAll();
-    }
-
-    /* ===================== Helpers ===================== */
-
     /** Normalize outcome name to our canonical picks. */
     private String normalizePick(String name) {
         if (name == null) return null;
