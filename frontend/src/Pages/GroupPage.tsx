@@ -328,30 +328,34 @@ export default function GroupPage() {
         )}
       </div>
 
-      <SectionCard title="Browse your groups">
-        {loadingGroups ? (
-          <GroupsGridSkeleton count={6} />
-        ) : gridCards.length === 0 ? (
-          <EmptyState
-            title="No groups match your search"
-            text="Try clearing your filters or create a new group."
-            actionText={searchQ ? "Clear search" : undefined}
-            onAction={searchQ ? () => setSearchQ('') : undefined}
-          />
-        ) : (
-          <GroupsGrid
-            groups={gridCards}
-            onSelect={id => {
-              const g = groups.find(x => x.id === id);
-              if (g) selectGroup(g);
-            }}
-            onOpen={id => {
-              const g = groups.find(x => x.id === id);
-              if (g) enterGroup(g);
-            }}
-          />
-        )}
-      </SectionCard>
+      {/* ADDED marginBottom to create space before the overview section */}
+      {/* space before the overview section */}
+      <div style={{ marginBottom: 16 }}>
+        <SectionCard title="Browse your groups">
+          {loadingGroups ? (
+            <GroupsGridSkeleton count={6} />
+          ) : gridCards.length === 0 ? (
+            <EmptyState
+              title="No groups match your search"
+              text="Try clearing your filters or create a new group."
+              actionText={searchQ ? "Clear search" : undefined}
+              onAction={searchQ ? () => setSearchQ('') : undefined}
+            />
+          ) : (
+            <GroupsGrid
+              groups={gridCards}
+              onSelect={id => {
+                const g = groups.find(x => x.id === id);
+                if (g) selectGroup(g);
+              }}
+              onOpen={id => {
+                const g = groups.find(x => x.id === id);
+                if (g) enterGroup(g);
+              }}
+            />
+          )}
+        </SectionCard>
+      </div>
 
       <SectionCard>
         {!selectedGroup ? (

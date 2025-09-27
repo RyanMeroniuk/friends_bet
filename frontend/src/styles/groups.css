@@ -230,4 +230,62 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* === FriendsBet Groups theming (append to end) === */
+
+/* Title uses the dark blue to anchor the page */
+.fb-page-title,
+.fb-section-title,
+.fb-page h1,
+.fb-page h2 {
+  color: var(--fb-cl-navy);
+}
+
+/* Section headers underline with a peach tint */
+.fb-section-card > h3,
+.fb-section-card > header h3 {
+  border-bottom: 1px solid #efcfbf;
+  padding-bottom: 6px;
+}
+
+/* Grid cards feel a touch creamier */
+.fb-groups-grid,
+.fb-group-card {
+  --fb-grid-border: #efdfd4;
+}
+.fb-group-card {
+  border-color: var(--fb-grid-border);
+}
+/* Blend the overall page surface into the app background */
+.fb-two-col {
+  /* no card background here; let the app/page bg show through */
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+
+  /* keep some breathing room around content */
+  padding: 16px;
+}
+
+.fb-two-col__inner {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.fb-two-col__main,
+.fb-two-col__right {
+  /* no background on the columns themselves */
+  background: transparent;
+}
+
+/* Stack on small screens */
+@media (max-width: 980px) {
+  .fb-two-col__inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Section cards keep their white surface and shadow as before */
 

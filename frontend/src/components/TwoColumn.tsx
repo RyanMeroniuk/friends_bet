@@ -1,23 +1,17 @@
-import React from "react";
+// src/components/TwoColumn.tsx
+import React from 'react';
 
-/**
- * TwoColumn
- * - Responsive layout: main content + right rail
- * - Mobile: stacks vertically
- * - Desktop: right rail fixed width ~360px
- */
-export default function TwoColumn({
-  main,
-  right,
-}: {
+type Props = {
   main: React.ReactNode;
-  right?: React.ReactNode;
-}) {
+  right: React.ReactNode;
+};
+
+export default function TwoColumn({ main, right }: Props) {
   return (
-    <div className="fb-container">
-      <div className="fb-grid">
-        <main className="fb-main">{main}</main>
-        {right ? <aside className="fb-aside">{right}</aside> : null}
+    <div className="fb-two-col">
+      <div className="fb-two-col__inner">
+        <main className="fb-two-col__main">{main}</main>
+        <aside className="fb-two-col__right">{right}</aside>
       </div>
     </div>
   );

@@ -513,4 +513,106 @@
 @media (max-width: 640px) {
   .fb-brand-badge { display: none; }
 }
+/* === FriendsBet Theme (Cream/Peach/Rose + Dark Blue) === */
+/* Append to end of ui.css */
+
+:root {
+  /* Core palette */
+  --fb-cl-cream: #F6E8DF;
+  --fb-cl-peach: #FEAE96;
+  --fb-cl-rose:  #FE979C;
+  --fb-cl-navy:  #013237;
+
+  /* Swap core tokens to theme */
+  --fb-primary: var(--fb-cl-navy);         /* buttons, primary accents */
+  --fb-primary-contrast: #ffffff;
+  --fb-bg-page: var(--fb-cl-cream);        /* page background */
+}
+
+/* Page background (affects all pages) */
+body {
+  background: var(--fb-bg-page);
+}
+
+/* Buttons – keep dark blue primary, soften ghost hover with cream */
+.fb-btn--primary {
+  background: var(--fb-primary);
+  color: var(--fb-primary-contrast);
+  border-color: var(--fb-primary);
+}
+.fb-btn--primary:hover {
+  filter: brightness(1.03);
+}
+
+.fb-btn--ghost {
+  background: #ffffff;
+  color: var(--fb-primary);
+  border-color: #e7d8cc;                   /* cream-tinted border */
+}
+.fb-btn--ghost:hover {
+  background: #fffaf7;                      /* subtle cream hover */
+  border-color: #e7d8cc;
+}
+
+/* Tabs – use peach as the active pill */
+.fb-tabs__list {
+  background: #fff;
+  border-color: #efdcd1;                    /* cream border */
+}
+.fb-tabs__tab.is-active {
+  background: color-mix(in srgb, var(--fb-cl-peach) 20%, white);
+  color: #0f172a;
+}
+
+/* Invite Code pill – faint peach border */
+.fb-pill {
+  border-color: #efcfbf;
+}
+
+/* Badges / stats – keep white cards, cream borders */
+.fb-badge,
+.fb-stat {
+  border-color: #efdfd4;
+}
+
+/* Cards & right rail feel more airy against cream */
+.fb-card,
+.fb-section-card {
+  background: #ffffff;
+  border-color: #efdfd4 !important;
+}
+
+/* Toasts – keep tones, adjust neutral frame to cream */
+.fb-toast {
+  border-color: #efdfd4;
+}
+
+/* Dropdown menu border to cream */
+.fb-dd__menu {
+  border-color: #efdfd4;
+}
+
+/* Meta row bullets and labels – slight rose tint for icons/• */
+.fb-meta-row {
+  color: #475569;
+}
+.fb-meta-row kbd {
+  background: #fff;
+  border: 1px solid #efdfd4;
+  border-bottom-width: 2px;
+}
+
+/* Group grid hover – soft peach glow */
+.fb-group-card:hover,
+.fb-btn.fb-btn--field:hover {
+  box-shadow: 0 4px 16px rgba(254, 174, 150, 0.18);
+}
+
+/* Brand badge (logo) – keep sticker vibe on cream */
+.fb-brand-badge {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 
