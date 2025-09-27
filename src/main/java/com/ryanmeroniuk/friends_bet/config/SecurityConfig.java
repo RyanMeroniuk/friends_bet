@@ -1,6 +1,7 @@
 package com.ryanmeroniuk.friends_bet.config;
 
 import com.ryanmeroniuk.friends_bet.filter.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -33,7 +34,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // NEW: make unauthenticated => 401, access denied => 403
+                .exceptionHandling(h -> h
+                        .authenticationEntryPoint((req, res, ex) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED)) // 401
+                        .accessDeniedHandler((req, res, ex) -> res.sendError(HttpServletResponse.SC_FORBIDDEN))          // 403
+                )
+
                 .authorizeHttpRequests(auth -> auth
+                        // Auth endpoints + health are public
                         .requestMatchers(
                                 "/api/users/register",
                                 "/api/users/login",
@@ -43,8 +52,12 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/h2-console/**"
                         ).permitAll()
+
+                        // (Optional) public read for browse; keep if you intend this
                         .requestMatchers(HttpMethod.GET, "/api/sports/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
+
+                        // Everything else under /api/** requires a valid access token
                         .requestMatchers("/api/**").authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -50,8 +50,12 @@ function App() {
         >
           <Route index element={<Navigate to="groups" replace />} />
           <Route path="groups" element={<GroupPage />} />
+          <Route path="groups/:groupId/bets" element={<BetPage />} />
+
+          {/* existing routes */}
           <Route path="wallets" element={<WalletPage />} />
           <Route path="bets" element={<BetPage />} />
+
           <Route path="*" element={<Navigate to="groups" replace />} />
         </Route>
 

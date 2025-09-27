@@ -208,3 +208,235 @@
 .fb-kv__row:last-child { border-bottom: none; }
 .fb-kv__label { color: var(--fb-text); font-weight: 600; }
 .fb-kv__value { color: var(--fb-muted); font-size: 12px; }
+/* Step 8: field-shaped button modifier
+   Makes a standalone button visually match input height/shape */
+.fb-btn--field {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-radius: var(--fb-radius);
+}
+
+/* Improve pairing inside input-group when the trailing button is ghost */
+.fb-input-group .fb-btn.fb-btn--ghost {
+  border-left: 0; /* seamless border with the input */
+}
+/* === Step 9: Modal === */
+.fb-modal__backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,0.48);
+  display: grid; place-items: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.fb-modal {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  box-shadow: 0 20px 48px rgba(15,23,42,0.25);
+  overflow: hidden;
+}
+.fb-modal__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid #e5e7eb;
+}
+.fb-modal__title { margin: 0; font-size: 16px; font-weight: 700; color: var(--fb-text); }
+.fb-modal__close {
+  border: 0; background: transparent; cursor: pointer; font-size: 20px; line-height: 1;
+  color: var(--fb-muted);
+}
+.fb-modal__body { padding: 16px; display: grid; gap: 12px; }
+.fb-modal__footer { padding: 12px 16px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Ensure field-shaped buttons work nicely inside input-group */
+.fb-input-group .fb-btn--field { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+/* === Step 11: Invite code pill === */
+.fb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--fb-border);
+  background: #fff;
+  border-radius: var(--fb-radius);
+  padding: 6px 6px 6px 10px;
+}
+.fb-pill__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: #0f172a;
+  user-select: all;
+}
+.fb-pill__btn {
+  margin-left: 2px;
+}
+
+/* === Step 11: Tooltip === */
+.fb-tooltip-wrap { position: relative; display: inline-flex; }
+.fb-tooltip {
+  position: absolute;
+  white-space: nowrap;
+  background: #0f172a;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  pointer-events: none;
+  transform: translate(-50%, -8px);
+  left: 50%;
+  z-index: 20;
+}
+.fb-tooltip--bottom { transform: translate(-50%, 8px); top: 100%; }
+.fb-tooltip--top { bottom: 100%; }
+
+/* Small helper row under section headers for meta chips */
+.fb-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #475569;
+  font-size: 12px;
+}
+/* === Step 12: Dropdown === */
+.fb-dd { position: relative; display: inline-block; }
+.fb-dd__menu {
+  position: absolute;
+  min-width: 160px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  box-shadow: 0 12px 28px rgba(15,23,42,0.18);
+  z-index: 50;
+  top: calc(100% + 6px);
+}
+.fb-dd__menu--right { right: 0; }
+.fb-dd__menu--left { left: 0; }
+.fb-dd__item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--fb-text);
+}
+.fb-dd__item:hover:not(:disabled) { background: #f1f5f9; }
+.fb-dd__item:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Small actions row on the right of the group header */
+.fb-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* === Step 13: Tabs + fade === */
+.fb-tabs { width: 100%; }
+.fb-tabs__list {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--fb-border);
+  background: #fff;
+  border-radius: var(--fb-radius);
+}
+.fb-tabs__tab {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--fb-text);
+}
+.fb-tabs__tab.is-active {
+  background: #eef2ff;
+  color: #1e293b;
+}
+
+/* simple fade container helper */
+.fb-fade {
+  animation: fb-fade-in 160ms ease-out;
+}
+@keyframes fb-fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* === Step 14: Overview widgets (scoped) === */
+.fb-overview {
+  display: grid;
+  gap: 12px;
+}
+
+/* Quick actions */
+.fb-overview .fb-qa {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+
+/* Stats */
+.fb-overview .fb-overview__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fb-overview .fb-stat {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--fb-border);
+  background: #fff;
+  border-radius: var(--fb-radius);
+  min-width: 110px;
+}
+.fb-overview .fb-stat__value {
+  font-weight: 700;
+  font-size: 16px;
+  color: #0f172a;
+}
+.fb-overview .fb-stat__label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Activity */
+.fb-overview .fb-activity { display: grid; gap: 8px; }
+.fb-overview .fb-activity__row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--fb-border);
+  background: #fff;
+  border-radius: 10px;
+}
+.fb-overview .fb-activity__icon { width: 20px; height: 20px; display: inline-grid; place-items: center; }
+.fb-overview .fb-activity__text { color: #0f172a; }
+.fb-overview .fb-activity__time { font-size: 12px; color: #64748b; }
+
+/* Tips */
+.fb-overview .fb-tips {
+  border: 1px dashed var(--fb-border);
+  background: #fafafa;
+  border-radius: var(--fb-radius);
+  padding: 12px;
+}
+.fb-overview .fb-tips__title { font-weight: 700; margin-bottom: 6px; color: #0f172a; }
+.fb-overview .fb-tips__body p { margin: 0 0 8px; color: #475569; }
+
+/* Shimmer used inside overview’s ActivityList */
+.fb-overview .fb-skeleton {
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f4f6f8 25%, #eef1f5 37%, #f4f6f8 63%);
+  background-size: 400% 100%;
+  animation: fb-shimmer 1.1s infinite;
+}
+@keyframes fb-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }

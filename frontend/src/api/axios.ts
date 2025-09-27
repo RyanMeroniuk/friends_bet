@@ -8,7 +8,7 @@ export type AuthAxiosRequestConfig = InternalAxiosRequestConfig & {
 
 const api = axios.create({
   baseURL: 'http://localhost:3000',
-  withCredentials: true,
+  withCredentials: true, // required to send the HttpOnly refresh cookie
 });
 
 let accessToken: string | null = null;
@@ -27,10 +27,9 @@ function emitToken(token: string | null) {
   tokenListener?.(token);
 }
 
+// Attach Authorization for normal requests (not for refresh)
 api.interceptors.request.use((config: AuthAxiosRequestConfig) => {
-  if (config.skipAuthRefresh) {
-    return config;
-  }
+  if (config.skipAuthRefresh) return config;
 
   if (accessToken) {
     if (!config.headers) {
@@ -49,16 +48,14 @@ api.interceptors.request.use((config: AuthAxiosRequestConfig) => {
 async function requestNewAccessToken(): Promise<string> {
   if (!refreshPromise) {
     const config = {
-      skipAuthRefresh: true,
+      skipAuthRefresh: true, // don't attach stale Authorization on refresh call
     } as AuthAxiosRequestConfig;
+
     refreshPromise = api
-      .post<{ accessToken: string }>(
-        '/api/users/refresh',
-        {},
-        config
-      )
+      .post<{ accessToken: string }>('/api/users/refresh', {}, config)
       .then((resp) => {
-        const token = resp.data.accessToken;
+        const token = resp.data?.accessToken;
+        if (!token) throw new Error('Refresh returned no accessToken');
         setAxiosAccessToken(token);
         emitToken(token);
         return token;
@@ -67,7 +64,6 @@ async function requestNewAccessToken(): Promise<string> {
         refreshPromise = null;
       });
   }
-
   return refreshPromise;
 }
 
@@ -77,27 +73,47 @@ api.interceptors.response.use(
     const { response, config } = error;
     const requestConfig = config as AuthAxiosRequestConfig | undefined;
 
-    const isAuthEndpoint = requestConfig?.url?.includes('/api/users/login') ||
-      requestConfig?.url?.includes('/api/users/refresh');
+    // No config (very rare) -> just bubble
+    if (!requestConfig) return Promise.reject(error);
 
-    if (
-      response?.status === 401 &&
-      requestConfig &&
+    const url = (requestConfig.url ?? '').toString();
+    const status = response?.status;
+    const isAuthEndpoint =
+      url.includes('/api/users/login') ||
+      url.includes('/api/users/refresh') ||
+      url.includes('/api/users/logout');
+
+    // Heuristic: treat certain 403s like auth failures to trigger refresh
+    // (belt & suspenders in case the server still returns 403 for expired tokens)
+    const body: any = response?.data;
+    const bodyStr =
+      typeof body === 'string' ? body : body ? JSON.stringify(body) : '';
+    const looksAuth403 =
+      status === 403 &&
+      /unauth|auth|token|expired|jwt|not\s*authenticated/i.test(bodyStr);
+
+    const shouldAttemptRefresh =
       !requestConfig._retry &&
       !requestConfig.skipAuthRefresh &&
-      !isAuthEndpoint
-    ) {
+      !isAuthEndpoint &&
+      (status === 401 || looksAuth403);
+
+    if (shouldAttemptRefresh) {
       requestConfig._retry = true;
       try {
         const token = await requestNewAccessToken();
+
+        // Ensure the retried request carries the fresh token
         if (!requestConfig.headers) {
           requestConfig.headers = AxiosHeaders.from({});
         } else if (!(requestConfig.headers instanceof AxiosHeaders)) {
           requestConfig.headers = AxiosHeaders.from(requestConfig.headers);
         }
         (requestConfig.headers as AxiosHeaders).set('Authorization', `Bearer ${token}`);
+
         return api(requestConfig);
       } catch (refreshError) {
+        // Refresh failed: clear token and bubble up (UI should route to login)
         setAxiosAccessToken(null);
         emitToken(null);
         return Promise.reject(refreshError);

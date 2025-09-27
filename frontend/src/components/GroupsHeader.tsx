@@ -2,14 +2,8 @@ import React from "react";
 import Input from "./Input";
 import Select from "./Select";
 import Badge from "./Badge";
+import Button from "./Button";
 
-/**
- * GroupsHeader
- * - Title + subtitle
- * - Search input (controlled by parent)
- * - Simple filter (native <select>, controlled by parent)
- * - Optional rightSlot for future actions (e.g., Create Group)
- */
 export default function GroupsHeader({
   title = "Your Groups",
   subtitle = "Select a group to view its members.",
@@ -19,6 +13,7 @@ export default function GroupsHeader({
   filter,
   onFilterChange,
   rightSlot,
+  searchRef, // NEW
 }: {
   title?: string;
   subtitle?: string;
@@ -28,6 +23,7 @@ export default function GroupsHeader({
   filter: string;
   onFilterChange: (val: string) => void;
   rightSlot?: React.ReactNode;
+  searchRef?: React.Ref<HTMLInputElement>; // NEW
 }) {
   return (
     <div className="fb-header">
@@ -41,12 +37,40 @@ export default function GroupsHeader({
 
       <div className="fb-header__controls">
         <div className="fb-header__search">
-          <Input
-            placeholder="Search your groups…"
-            aria-label="Search groups"
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
+          <div className="fb-input-group">
+            <Input
+              ref={searchRef as any}
+              placeholder="Search your groups…"
+              aria-label="Search groups"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+            {search ? (
+              <Button
+                variant="ghost"
+                size="md"
+                className="fb-btn--field"
+                type="button"
+                onClick={() => onSearchChange("")}
+                aria-label="Clear search"
+                title="Clear search"
+              >
+                Clear
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="md"
+                className="fb-btn--field"
+                type="button"
+                disabled
+                aria-hidden="true"
+                style={{ opacity: 0.5 }}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="fb-header__filter">
@@ -56,7 +80,6 @@ export default function GroupsHeader({
             onChange={(e) => onFilterChange(e.target.value)}
           >
             <option value="all">All</option>
-            {/* Future: add sports or types here */}
           </Select>
         </div>
 
