@@ -13,7 +13,7 @@ export default function GroupListSkeleton({ rows = 6 }: { rows?: number }) {
               width: "100%",
               padding: "10px 12px",
               borderRadius: 10,
-              border: "1px solid #e5e7eb",
+              border: '1px solid var(--fb-border)',
               background: "#ffffff",
             }}
           >

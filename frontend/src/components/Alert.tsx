@@ -16,7 +16,7 @@ export default function Alert({
     <div
       style={{
         background: map.bg,
-        border: `1px solid ${map.bd}`,
+        border: '1px solid var(--fb-border)',
         color: map.fg,
         borderRadius: 10,
         padding: "8px 10px",

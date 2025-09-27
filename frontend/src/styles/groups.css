@@ -2,7 +2,7 @@
 :root {
   --fb-bg: #f7f8fb;
   --fb-card-bg: #ffffff;
-  --fb-border: #e7e9ee;
+  --fb-border: #c8ceda;
   --fb-text: #0f172a;
   --fb-muted: #64748b;
   --fb-radius: 14px;
@@ -288,4 +288,3 @@
 }
 
 /* Section cards keep their white surface and shadow as before */
-
