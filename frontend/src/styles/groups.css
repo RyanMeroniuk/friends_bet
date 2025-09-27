@@ -137,4 +137,97 @@
     grid-template-columns: 1fr;
   }
 }
+/* === Step 4: Groups grid & card === */
+
+.fb-groups-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 520px) {
+  .fb-groups-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .fb-groups-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .fb-groups-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.fb-group-card {
+  width: 100%;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  box-shadow: var(--fb-shadow);
+  cursor: pointer;
+  padding: 14px;
+  transition: transform 0.02s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.fb-group-card:hover {
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  border-color: #dbe3ee;
+}
+.fb-group-card:focus-visible {
+  outline: none;
+  box-shadow: var(--fb-focus);
+}
+.fb-group-card:active { transform: translateY(0.5px); }
+
+.fb-group-card.is-active {
+  background: #eef5ff;
+  border-color: #cfe3ff;
+}
+
+.fb-group-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fb-group-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fb-group-card__desc {
+  margin: 4px 0 10px 0;
+  color: var(--fb-muted);
+  font-size: 13px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fb-group-card__stats {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.fb-group-card__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--fb-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.fb-group-card__next {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 

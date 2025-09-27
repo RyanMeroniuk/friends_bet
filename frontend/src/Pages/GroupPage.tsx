@@ -11,19 +11,23 @@ import {
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
 
-/* === Step 1 wrappers === */
+/* Step 1 wrappers */
 import TwoColumn from '../components/TwoColumn';
 import RightRail from '../components/RightRail';
 import SectionCard from '../components/SectionCard';
 import '../styles/groups.css';
 
-/* === Step 2 primitives === */
+/* Step 2 primitives */
 import Button from '../components/Button';
 import Input from '../components/Input';
 import '../styles/ui.css';
 
-/* === Step 3 header === */
+/* Step 3 header */
 import GroupsHeader from '../components/GroupsHeader';
+
+/* Step 4 grid + card */
+import GroupsGrid from '../components/GroupsGrid';
+import { GroupCardProps } from '../components/GroupCard';
 
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -34,7 +38,7 @@ export default function GroupPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(false);
 
-  /* Step 3: local UI state (search + filter) */
+  /* Step 3 UI state */
   const [searchQ, setSearchQ] = useState('');
   const [groupFilter, setGroupFilter] = useState<'all'>('all');
 
@@ -156,7 +160,7 @@ export default function GroupPage() {
     }
   }
 
-  /* Step 3: derive filtered view for the sidebar list only */
+  /* Step 3: filter for sidebar & grid */
   const filteredGroups = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     let arr = groups;
@@ -166,31 +170,65 @@ export default function GroupPage() {
         (g.inviteCode ?? "").toLowerCase().includes(q)
       );
     }
-    // Filter hook for future categories (sports, etc.)
+    // placeholder for future tags
     if (groupFilter !== 'all') {
-      // placeholder: no-op until you have tags
       arr = arr;
     }
     return arr;
   }, [groups, searchQ, groupFilter]);
 
+  /* Step 4: map to GroupCardProps for the grid (static placeholders allowed) */
+  const gridCards: GroupCardProps[] = useMemo(() => {
+    return filteredGroups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      description: "",            // placeholder until you store descriptions
+      sportTag: undefined,        // placeholder; set if you add sport to GroupResponse
+      membersCount: undefined,    // placeholder; can derive when backend returns count
+      winRatePct: undefined,      // placeholder
+      nextEventSummary: undefined,// placeholder
+      active: g.id === groupId,
+    }));
+  }, [filteredGroups, groupId]);
+
   /* ====== RENDER ====== */
 
   const mainColumn = (
     <>
-      <GroupsHeader
-        totalGroups={groups.length}
-        search={searchQ}
-        onSearchChange={setSearchQ}
-        filter={groupFilter}
-        onFilterChange={(v) => setGroupFilter(v as 'all')}
-        // rightSlot: add future actions here (e.g., "Create Group" button that opens a modal)
-      />
-      {message && <p style={{ color: '#0a6', margin: '4px 0 12px' }}>{message}</p>}
+      <div>
+        <GroupsHeader
+          totalGroups={groups.length}
+          search={searchQ}
+          onSearchChange={setSearchQ}
+          filter={groupFilter}
+          onFilterChange={(v) => setGroupFilter(v as 'all')}
+        />
+        {message && <p style={{ color: '#0a6', margin: '4px 0 12px' }}>{message}</p>}
+      </div>
 
+      {/* New: browse grid (keeps right-rail list intact) */}
+      <SectionCard title="Browse your groups">
+        {gridCards.length === 0 ? (
+          <div>No groups match your search.</div>
+        ) : (
+          <GroupsGrid
+            groups={gridCards}
+            onSelect={(id) => {
+              const g = groups.find(x => x.id === id);
+              if (g) selectGroup(g);
+            }}
+            onOpen={(id) => {
+              const g = groups.find(x => x.id === id);
+              if (g) enterGroup(g);
+            }}
+          />
+        )}
+      </SectionCard>
+
+      {/* Details for the selected group (unchanged) */}
       <SectionCard>
         {!selectedGroup ? (
-          <div>Select a group from the sidebar to view its details.</div>
+          <div>Select a group from the grid or sidebar to view its details.</div>
         ) : (
           <>
             <header
