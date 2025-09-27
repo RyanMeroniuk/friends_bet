@@ -2,9 +2,11 @@ package com.ryanmeroniuk.friends_bet.filter;
 
 import com.ryanmeroniuk.friends_bet.service.UserDetailsService;
 import com.ryanmeroniuk.friends_bet.util.JwtUtil;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -24,14 +26,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.userDetailsService = uds;
     }
 
-    /**
-     * Skip filtering for registration, login, and H2 console endpoints.
-     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
         return path.equals("/api/users/register")
                 || path.equals("/api/users/login")
+                || path.equals("/api/users/refresh")
+                || path.equals("/api/users/logout")
                 || path.startsWith("/h2-console");
     }
 
@@ -45,18 +46,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
-                String username = jwtUtil.validateTokenAndGetUsername(token);
+                Claims claims = jwtUtil.parseAndValidate(token);
+                String tokenType = claims.get("token_type", String.class);
+                if (!"access".equals(tokenType)) {
+                    chain.doFilter(req, res);
+                    return;
+                }
+
+                String username = claims.getSubject();
                 var userDetails = userDetailsService.loadUserByUsername(username);
                 var auth = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } catch (Exception e) {
-                // Invalid token → return 401 immediately
-                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
+                SecurityContextHolder.clearContext();
             }
         }
-        // Proceed down the filter chain
         chain.doFilter(req, res);
     }
 }

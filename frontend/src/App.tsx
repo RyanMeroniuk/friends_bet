@@ -3,34 +3,58 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import AuthPage   from './pages/AuthPage';
-import MainPage   from './pages/MainPage';
-import GroupPage  from './pages/GroupPage';
-import WalletPage from './pages/WalletPage';
-import BetPage    from './pages/BetPage';
+import AuthPage from './Pages/AuthPage';
+import MainPage from './Pages/MainPage';
+import GroupPage from './Pages/GroupPage';
+import WalletPage from './Pages/WalletPage';
+import BetPage from './Pages/BetPage';
+import { useAuth } from './context/AuthContext';
+
+function RequireAuth({ children }: { children: React.ReactElement }) {
+  const { user, initializing } = useAuth();
+
+  if (initializing) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading session…</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return children;
+}
+
+function PublicAuthRoute() {
+  const { user, initializing } = useAuth();
+
+  if (!initializing && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <AuthPage />;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* 1) Public auth */}
-        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/auth" element={<PublicAuthRoute />} />
 
-        {/* 2) Dashboard layout with nested routes */}
-        <Route path="/dashboard/*" element={<MainPage />}>
-          {/* Redirect /dashboard → /dashboard/groups */}
+        <Route
+          path="/dashboard/*"
+          element={
+            <RequireAuth>
+              <MainPage />
+            </RequireAuth>
+          }
+        >
           <Route index element={<Navigate to="groups" replace />} />
-
-          {/* These will render inside <Outlet /> of MainPage */}
-          <Route path="groups"  element={<GroupPage  />} />
+          <Route path="groups" element={<GroupPage />} />
           <Route path="wallets" element={<WalletPage />} />
-          <Route path="bets"    element={<BetPage    />} />
-
-          {/* Any other /dashboard/... → back to groups */}
+          <Route path="bets" element={<BetPage />} />
           <Route path="*" element={<Navigate to="groups" replace />} />
         </Route>
 
-        {/* 3) Everything else → /auth */}
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
     </BrowserRouter>

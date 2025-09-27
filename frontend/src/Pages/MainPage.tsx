@@ -12,30 +12,19 @@ import {
   Typography,
   AppBar,
 } from '@mui/material';
-
-interface AuthUser {
-  id: string;
-  username: string;
-  email: string;
-  createdAt: string;
-  token: string;
-}
+import { useAuth } from '../context/AuthContext';
 
 export default function MainPage() {
-  const stored = localStorage.getItem('authUser');
-  const user: AuthUser = stored ? JSON.parse(stored) : null!;
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  React.useEffect(() => {
-    if (!stored) navigate('/auth');
-  }, [stored, navigate]);
-
-  const logout = () => {
-    localStorage.removeItem('authUser');
+  const handleLogout = async () => {
+    await logout();
     navigate('/auth');
   };
 
   const copyId = async () => {
+    if (!user?.id) return;
     try {
       await navigator.clipboard.writeText(user.id);
     } catch {
@@ -43,18 +32,20 @@ export default function MainPage() {
     }
   };
 
+  if (!user) {
+    return <div style={{ padding: '2rem' }}>Loading user…</div>;
+  }
+
   const drawerWidth = 240;
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* Top AppBar */}
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             FriendsBet
           </Typography>
 
-          {/* Logged-in user info */}
           <Typography variant="body1" sx={{ mr: 2 }}>
             {user.username}
           </Typography>
@@ -66,11 +57,10 @@ export default function MainPage() {
           </Typography>
           <button onClick={copyId} style={{ marginRight: 12 }}>Copy ID</button>
 
-          <button onClick={logout}>Logout</button>
+          <button onClick={handleLogout}>Logout</button>
         </Toolbar>
       </AppBar>
 
-      {/* Side Drawer */}
       <Drawer
         variant="permanent"
         sx={{
@@ -95,10 +85,8 @@ export default function MainPage() {
         </List>
       </Drawer>
 
-      {/* Main Content */}
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
         <Toolbar />
-        {/* Renders the matching nested route */}
         <Outlet />
       </Box>
     </Box>

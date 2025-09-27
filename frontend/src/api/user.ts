@@ -1,11 +1,7 @@
-import api from './axios';
+import api, { AuthAxiosRequestConfig } from './axios';
 
-export interface AuthResponse {
-  id: string;
-  username: string;
-  email: string;
-  createdAt: string;
-  token: string;
+export interface AccessTokenResponse {
+  accessToken: string;
 }
 
 export interface CreateUserRequest {
@@ -19,18 +15,35 @@ export interface LoginRequest {
   password: string;
 }
 
-/**
- * POST /api/users/register
- */
-export async function registerUser(req: CreateUserRequest): Promise<AuthResponse> {
-  const resp = await api.post<AuthResponse>('/api/users/register', req);
+export interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  createdAt: string;
+}
+
+export async function registerUser(req: CreateUserRequest): Promise<AccessTokenResponse> {
+  const resp = await api.post<AccessTokenResponse>('/api/users/register', req);
   return resp.data;
 }
 
-/**
- * POST /api/users/login
- */
-export async function loginUser(req: LoginRequest): Promise<AuthResponse> {
-  const resp = await api.post<AuthResponse>('/api/users/login', req);
+export async function loginUser(req: LoginRequest): Promise<AccessTokenResponse> {
+  const resp = await api.post<AccessTokenResponse>('/api/users/login', req);
+  return resp.data;
+}
+
+export async function refreshSession(): Promise<AccessTokenResponse> {
+  const config = { skipAuthRefresh: true } as AuthAxiosRequestConfig;
+  const resp = await api.post<AccessTokenResponse>('/api/users/refresh', {}, config);
+  return resp.data;
+}
+
+export async function logoutUser(): Promise<void> {
+  const config = { skipAuthRefresh: true } as AuthAxiosRequestConfig;
+  await api.post('/api/users/logout', {}, config);
+}
+
+export async function getCurrentUser(): Promise<UserProfile> {
+  const resp = await api.get<UserProfile>('/api/users/me');
   return resp.data;
 }

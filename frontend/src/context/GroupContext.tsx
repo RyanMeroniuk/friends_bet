@@ -2,12 +2,12 @@ import React, { createContext, useState, ReactNode, useContext } from 'react';
 
 type GroupContextType = {
   groupId: string | null;
-  setGroupId: (id: string) => void;
+  setGroupId: (id: string | null) => void;
 };
 
 const GroupContext = createContext<GroupContextType>({
   groupId: null,
-  setGroupId: () => {}
+  setGroupId: () => {},
 });
 
 export function GroupProvider({ children }: { children: ReactNode }) {

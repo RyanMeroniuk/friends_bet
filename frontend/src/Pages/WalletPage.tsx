@@ -9,6 +9,7 @@ import {
 import { listMyGroups, GroupResponse } from '../api/group';
 import { getMyBalance, deposit } from '../api/wallet';
 import { useGroup } from '../context/GroupContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function WalletPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -18,37 +19,31 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingBal, setLoadingBal] = useState(false);
 
-  // current user
-  const auth = JSON.parse(localStorage.getItem('authUser') || '{}');
-  const userId: string = auth.id;
-
-  // share the selected group id across pages
   const { groupId, setGroupId } = useGroup();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? '';
 
-  // load “my groups” on mount
   useEffect(() => {
+    if (!currentUserId) return;
     (async () => {
       try {
-        const mine = await listMyGroups(userId);
+        const mine = await listMyGroups(currentUserId);
         setGroups(mine);
-        // auto-pick first if none selected yet
         if (!groupId && mine.length > 0) setGroupId(mine[0].id);
       } catch {
         setError('Failed to load your groups');
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [currentUserId]);
 
-  // selected group object
   const selected = useMemo(
     () => groups.find(g => g.id === groupId),
     [groups, groupId]
   );
 
-  // fetch balance whenever selected group changes
   useEffect(() => {
-    if (!selected) {
+    if (!selected || !currentUserId) {
       setBalance(null);
       return;
     }
@@ -56,7 +51,7 @@ export default function WalletPage() {
       try {
         setLoadingBal(true);
         setError(null);
-        const bal = await getMyBalance(selected.id, userId);
+        const bal = await getMyBalance(selected.id, currentUserId);
         setBalance(bal);
       } catch (e: any) {
         setError(e?.response?.data || 'Could not load balance');
@@ -65,7 +60,7 @@ export default function WalletPage() {
         setLoadingBal(false);
       }
     })();
-  }, [selected, userId]);
+  }, [selected, currentUserId]);
 
   function selectGroup(id: string) {
     setGroupId(id);
@@ -82,10 +77,10 @@ export default function WalletPage() {
       setError('Please enter a valid positive amount (in cents).');
       return;
     }
-    if (!selected) return;
+    if (!selected || !currentUserId) return;
 
     try {
-      const wallet = await deposit(selected.id, userId, amountCents);
+      const wallet = await deposit(selected.id, currentUserId, amountCents);
       setMessage(`Deposited $${(amountCents / 100).toFixed(2)}.`);
       setDepositAmt('');
       setBalance(wallet.balanceCents);
@@ -94,7 +89,6 @@ export default function WalletPage() {
     }
   }
 
-  // simple styles to mirror your Groups page
   const layout: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '280px 1fr',
@@ -134,7 +128,6 @@ export default function WalletPage() {
       )}
 
       <div style={layout}>
-        {/* LEFT: your groups */}
         <aside style={card}>
           <Typography variant="h6" sx={{ mb: 1 }}>
             Your Groups
@@ -154,7 +147,6 @@ export default function WalletPage() {
           ))}
         </aside>
 
-        {/* RIGHT: selected group wallet */}
         <main style={card}>
           {!selected ? (
             <div>Select a group on the left to view your wallet.</div>
@@ -172,20 +164,17 @@ export default function WalletPage() {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => {
-                    if (!selected) return;
-                    // re-fetch balance
-                    (async () => {
-                      try {
-                        setLoadingBal(true);
-                        const bal = await getMyBalance(selected.id, userId);
-                        setBalance(bal);
-                      } catch (e: any) {
-                        setError(e?.response?.data || 'Could not refresh balance');
-                      } finally {
-                        setLoadingBal(false);
-                      }
-                    })();
+                  onClick={async () => {
+                    if (!selected || !currentUserId) return;
+                    try {
+                      setLoadingBal(true);
+                      const bal = await getMyBalance(selected.id, currentUserId);
+                      setBalance(bal);
+                    } catch (e: any) {
+                      setError(e?.response?.data || 'Could not refresh balance');
+                    } finally {
+                      setLoadingBal(false);
+                    }
                   }}
                 >
                   Refresh
@@ -199,32 +188,28 @@ export default function WalletPage() {
                 {loadingBal
                   ? 'Loading…'
                   : balance !== null
-                  ? `$${(balance / 100).toFixed(2)}`
+                  ? `$${((balance || 0) / 100).toFixed(2)}`
                   : '—'}
               </Typography>
 
-              <Box
-                component="form"
-                onSubmit={e => {
-                  e.preventDefault();
-                  handleDeposit();
-                }}
-                sx={{ display: 'flex', gap: 2, alignItems: 'center' }}
-              >
+              <Typography variant="h6" sx={{ mt: 2 }}>
+                Deposit Funds
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
                 <TextField
                   label="Amount (cents)"
-                  type="text"
                   value={depositAmt}
+                  size="small"
                   onChange={e => setDepositAmt(e.target.value)}
-                  placeholder="e.g. 1000"
-                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                  required
-                  sx={{ maxWidth: 240 }}
                 />
-                <Button type="submit" variant="contained">
+                <Button variant="contained" onClick={handleDeposit} disabled={!currentUserId}>
                   Deposit
                 </Button>
               </Box>
+
+              <Typography variant="body2" sx={{ mt: 2, color: '#666' }}>
+                Deposits are instant and reflected immediately in your wallet balance.
+              </Typography>
             </>
           )}
         </main>

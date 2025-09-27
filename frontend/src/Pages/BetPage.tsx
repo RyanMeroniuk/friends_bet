@@ -17,6 +17,10 @@ import {
   Paper,
 } from '@mui/material';
 
+// NEW: use your helpers you said you added to bet.ts (adjust the path if you placed them elsewhere)
+import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi } from '../api/bet';
+import { useAuth } from '../context/AuthContext';
+
 type MarketType =
   | 'WINNER'
   | 'SPREAD'
@@ -28,11 +32,6 @@ type MarketType =
 
 const DAYS_WINDOW = 2; // next 2 days per backend endpoints
 const API_BASE = (process.env.REACT_APP_API_BASE || '').replace(/\/$/, '');
-function authToken() {
-  try { return JSON.parse(localStorage.getItem('authUser') || '{}')?.token; }
-  catch { return undefined; }
-}
-
 export default function BetPage() {
   // groups + selection (left panel unchanged)
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -44,8 +43,8 @@ export default function BetPage() {
   const [error, setError] = useState<string | null>(null);
 
   // propose form state
-  const auth = JSON.parse(localStorage.getItem('authUser')!);
-  const [userId, setUserId] = useState<string>(auth?.id ?? '');
+  const { user } = useAuth();
+  const userId = user?.id ?? '';
   const [gameId, setGameId] = useState<string>('');
   const [marketType, setMarketType] = useState<MarketType>('WINNER');
   const [pick, setPick] = useState<string>('HOME'); // WINNER/SPREAD team
@@ -102,14 +101,14 @@ export default function BetPage() {
 
   // ------- load groups (unchanged) -------
   useEffect(() => {
-    const auth = JSON.parse(localStorage.getItem('authUser')!);
-    listMyGroups(auth.id)
+    if (!userId) return;
+    listMyGroups(userId)
       .then(mine => {
         setGroups(mine);
         if (!selectedGroup && mine.length > 0) setSelectedGroup(mine[0].id);
       })
       .catch(() => setError('Could not load your groups'));
-  }, []);
+  }, [userId]);
 
   // ------- load bets when group changes (unchanged) -------
   useEffect(() => {
@@ -123,11 +122,9 @@ export default function BetPage() {
     (async () => {
       setSportsError(null);
       try {
-        const token = authToken();
         const res = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
           headers: {
             Accept: 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
         if (!res.ok) throw new Error(await res.text());
@@ -136,7 +133,7 @@ export default function BetPage() {
           setSports(list || []);
           if (!selectedSport && list?.length) setSelectedSport(list[0]);
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) setSportsError('Could not load sports');
       }
     })();
@@ -149,13 +146,11 @@ export default function BetPage() {
     let cancelled = false;
     (async () => {
       try {
-        const token = authToken();
         const res = await fetch(
           `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
           {
             headers: {
               Accept: 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
           }
         );
@@ -285,6 +280,7 @@ export default function BetPage() {
     setMessage(null);
     setError(null);
 
+    if (!userId) return setError('User session missing');
     if (!selectedGroup) return setError('Select a group first');
     if (!gameId.trim()) return setError('Game ID is required');
 
@@ -380,6 +376,10 @@ export default function BetPage() {
   async function onAccept(betId: string) {
     setMessage(null);
     setError(null);
+    if (!userId) {
+      setError('User session missing');
+      return;
+    }
     try {
       await acceptBet(betId, userId);
       setMessage('Bet accepted!');
@@ -389,29 +389,21 @@ export default function BetPage() {
     }
   }
 
-  // ---- NEW: Admin actions (two buttons) ----
+  // ---- CHANGED: Admin actions (two buttons) ----
+
   async function refreshOddsAndGames() {
     try {
       setBusyRefresh(true);
       setMessage(null);
       setError(null);
-      const token = authToken();
 
-      // 1) tell backend to refresh odds/sports/games
-      const res = await fetch(`${API_BASE}/api/admin/refresh?sport=all`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) throw new Error(await res.text());
+      // 1) Ask backend to refresh odds data
+      await refreshSports(selectedSport || undefined);
 
-      // 2) re-pull sports list, then games for selectedSport
+      // 2) Re-pull sports list
       const resSports = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
         headers: {
           Accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
       if (resSports.ok) {
@@ -421,13 +413,14 @@ export default function BetPage() {
           setSelectedSport(list[0]);
         }
       }
+
+      // 3) Re-pull games for current sport (if any)
       if (selectedSport) {
         const resGames = await fetch(
           `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
           {
             headers: {
               Accept: 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
           }
         );
@@ -446,7 +439,11 @@ export default function BetPage() {
 
       setMessage('Sports & games refreshed.');
     } catch (e: any) {
-      setError(e?.message || 'Failed to refresh sports/games');
+      const data = e?.response?.data;
+      const msg = (data && typeof data === 'object' && 'message' in data)
+        ? (data as any).message
+        : (typeof data === 'string' ? data : e?.message);
+      setError(msg || 'Failed to refresh sports/games');
     } finally {
       setBusyRefresh(false);
     }
@@ -457,31 +454,13 @@ export default function BetPage() {
       setBusySettle(true);
       setMessage(null);
       setError(null);
-      const token = authToken();
+      if (!selectedGroup) throw new Error('Select a group first');
 
-      // Prefer new endpoint
-      let res = await fetch(`${API_BASE}/api/admin/scores/refresh?sport=all`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-
-      // Fallback to older name if needed
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${API_BASE}/api/admin/sync-scores`, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-      }
-      if (!res.ok) throw new Error(await res.text());
-
-      await loadBets(); // reflect any settlements
-      setMessage('Settlement check complete.');
+      // Use your helper to settle accepted bets in this group
+      const res = await settleAcceptedBetsApi(selectedGroup);
+      // Refresh list to reflect any status changes
+      await loadBets();
+      setMessage(`Settlement check complete${typeof res?.settled === 'number' ? ` — ${res.settled} settled.` : '.'}`);
     } catch (e: any) {
       setError(e?.message || 'Failed to settle accepted bets');
     } finally {
@@ -511,7 +490,7 @@ export default function BetPage() {
 
         <FormControl>
           <InputLabel id="game-picker">Pick Game</InputLabel>
-        <Select
+          <Select
             labelId="game-picker"
             label="Pick Game"
             value={gameId}
@@ -530,9 +509,7 @@ export default function BetPage() {
     );
   }
 
-  // Dynamic fields per market (left panel untouched)
   function renderProposeFields() {
-    // Common tail (keeps your free-typing amount box)
     const commonEnd = (
       <>
         <TextField
@@ -559,10 +536,7 @@ export default function BetPage() {
       case 'WINNER':
         return (
           <>
-            {/* NEW: Sport + Game pickers */}
             <SportGamePickers />
-
-            {/* still allow manual override */}
             <TextField
               label="Game ID"
               value={gameId}
@@ -584,12 +558,10 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       case 'SPREAD':
         return (
           <>
             <SportGamePickers />
-
             <TextField
               label="Game ID"
               value={gameId}
@@ -619,12 +591,10 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       case 'TOTALS':
         return (
           <>
             <SportGamePickers />
-
             <TextField
               label="Game ID"
               value={gameId}
@@ -653,7 +623,6 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       case 'PLAYER_PROP':
         return (
           <>
@@ -707,7 +676,6 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       case 'TEAM_PROP':
         return (
           <>
@@ -757,7 +725,6 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       case 'SAME_GAME':
         return (
           <>
@@ -779,7 +746,6 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       case 'PARLAY':
         return (
           <>
@@ -801,7 +767,6 @@ export default function BetPage() {
             {commonEnd}
           </>
         );
-
       default:
         return null;
     }
@@ -858,7 +823,7 @@ export default function BetPage() {
 
       {/* RIGHT: stacked panels */}
       <Box sx={{ display: 'grid', gap: 2 }}>
-        {/* NEW: Admin toolbar */}
+        {/* Admin toolbar (CHANGED handlers only) */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
           <Button
             variant="outlined"
@@ -933,7 +898,8 @@ export default function BetPage() {
               <TextField
                 label="Your User ID"
                 value={userId}
-                onChange={e => setUserId(e.target.value)}
+                InputProps={{ readOnly: true }}
+                helperText={userId ? undefined : 'Sign in again if this is empty'}
                 required
               />
 
