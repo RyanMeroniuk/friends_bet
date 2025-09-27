@@ -96,3 +96,45 @@
   color: var(--fb-muted);
   font-size: 14px;
 }
+
+/* === Step 3: header layout === */
+.fb-header {
+  margin-bottom: 12px;
+}
+
+.fb-header__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fb-header__titles {
+  min-width: 0;
+}
+
+.fb-header__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fb-header__controls {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.fb-header__search,
+.fb-header__filter {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .fb-header__controls {
+    grid-template-columns: 1fr;
+  }
+}
+

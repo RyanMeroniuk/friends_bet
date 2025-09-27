@@ -22,6 +22,9 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import '../styles/ui.css';
 
+/* === Step 3 header === */
+import GroupsHeader from '../components/GroupsHeader';
+
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [members, setMembers] = useState<GroupMemberResponse[]>([]);
@@ -30,6 +33,10 @@ export default function GroupPage() {
   const [joinUserId, setJoinUserId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  /* Step 3: local UI state (search + filter) */
+  const [searchQ, setSearchQ] = useState('');
+  const [groupFilter, setGroupFilter] = useState<'all'>('all');
 
   const { groupId, setGroupId } = useGroup();
   const { user } = useAuth();
@@ -149,15 +156,37 @@ export default function GroupPage() {
     }
   }
 
-  /* ====== RENDER (layout + primitives, no logic changes) ====== */
+  /* Step 3: derive filtered view for the sidebar list only */
+  const filteredGroups = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    let arr = groups;
+    if (q) {
+      arr = arr.filter(g =>
+        (g.name ?? "").toLowerCase().includes(q) ||
+        (g.inviteCode ?? "").toLowerCase().includes(q)
+      );
+    }
+    // Filter hook for future categories (sports, etc.)
+    if (groupFilter !== 'all') {
+      // placeholder: no-op until you have tags
+      arr = arr;
+    }
+    return arr;
+  }, [groups, searchQ, groupFilter]);
+
+  /* ====== RENDER ====== */
 
   const mainColumn = (
     <>
-      <div>
-        <h1 className="fb-page-title">Your Groups</h1>
-        <p className="fb-page-subtitle">Select a group to view its members.</p>
-        {message && <p style={{ color: '#0a6', marginTop: 8 }}>{message}</p>}
-      </div>
+      <GroupsHeader
+        totalGroups={groups.length}
+        search={searchQ}
+        onSearchChange={setSearchQ}
+        filter={groupFilter}
+        onFilterChange={(v) => setGroupFilter(v as 'all')}
+        // rightSlot: add future actions here (e.g., "Create Group" button that opens a modal)
+      />
+      {message && <p style={{ color: '#0a6', margin: '4px 0 12px' }}>{message}</p>}
 
       <SectionCard>
         {!selectedGroup ? (
@@ -256,12 +285,12 @@ export default function GroupPage() {
         </div>
       </SectionCard>
 
-      {/* Your Groups list */}
+      {/* Your Groups list (filtered view) */}
       <SectionCard title="Your Groups">
-        {groups.length === 0 && <div>No groups yet.</div>}
-        {groups.length > 0 && (
+        {filteredGroups.length === 0 && <div>No groups match your search.</div>}
+        {filteredGroups.length > 0 && (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {groups.map(g => {
+            {filteredGroups.map(g => {
               const active = g.id === groupId;
               return (
                 <li key={g.id} style={{ marginBottom: 6 }}>
