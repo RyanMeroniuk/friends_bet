@@ -20,6 +20,7 @@ import '../styles/groups.css';
 /* Step 2 primitives */
 import Button from '../components/Button';
 import Input from '../components/Input';
+import EmptyState from '../components/EmptyState';
 import '../styles/ui.css';
 
 /* Step 3 header */
@@ -29,6 +30,11 @@ import GroupsHeader from '../components/GroupsHeader';
 import GroupsGrid from '../components/GroupsGrid';
 import { GroupCardProps } from '../components/GroupCard';
 
+/* Step 5 skeletons + optional alert */
+import GroupsGridSkeleton from '../components/GroupsGridSkeleton';
+import GroupListSkeleton from '../components/GroupListSkeleton';
+import Alert from '../components/Alert';
+
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [members, setMembers] = useState<GroupMemberResponse[]>([]);
@@ -37,6 +43,9 @@ export default function GroupPage() {
   const [joinUserId, setJoinUserId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(false);
+
+  /* NEW (UI-only): show skeletons while fetching groups */
+  const [loadingGroups, setLoadingGroups] = useState(false);
 
   /* Step 3 UI state */
   const [searchQ, setSearchQ] = useState('');
@@ -56,6 +65,7 @@ export default function GroupPage() {
     if (!currentUserId) return;
     (async () => {
       try {
+        setLoadingGroups(true); // UI-only
         const mine = await listMyGroups(currentUserId);
         setGroups(mine);
         if (!groupId && mine.length > 0) {
@@ -64,6 +74,8 @@ export default function GroupPage() {
       } catch (err) {
         console.error('Failed to load your groups', err);
         setMessage('Failed to load your groups');
+      } finally {
+        setLoadingGroups(false); // UI-only
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,6 +108,7 @@ export default function GroupPage() {
 
   async function reloadGroupsAndStay() {
     if (!currentUserId) return;
+    setLoadingGroups(true); // UI-only
     const mine = await listMyGroups(currentUserId);
     setGroups(mine);
     if (mine.length > 0) {
@@ -106,6 +119,7 @@ export default function GroupPage() {
     } else {
       setGroupId(null as any);
     }
+    setLoadingGroups(false); // UI-only
   }
 
   async function handleCreate() {
@@ -160,7 +174,7 @@ export default function GroupPage() {
     }
   }
 
-  /* Step 3: filter for sidebar & grid */
+  /* Filter for sidebar & grid (unchanged) */
   const filteredGroups = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     let arr = groups;
@@ -170,23 +184,23 @@ export default function GroupPage() {
         (g.inviteCode ?? "").toLowerCase().includes(q)
       );
     }
-    // placeholder for future tags
     if (groupFilter !== 'all') {
+      // placeholder for future tags
       arr = arr;
     }
     return arr;
   }, [groups, searchQ, groupFilter]);
 
-  /* Step 4: map to GroupCardProps for the grid (static placeholders allowed) */
+  /* Map to card props (placeholders remain) */
   const gridCards: GroupCardProps[] = useMemo(() => {
     return filteredGroups.map((g) => ({
       id: g.id,
       name: g.name,
-      description: "",            // placeholder until you store descriptions
-      sportTag: undefined,        // placeholder; set if you add sport to GroupResponse
-      membersCount: undefined,    // placeholder; can derive when backend returns count
-      winRatePct: undefined,      // placeholder
-      nextEventSummary: undefined,// placeholder
+      description: "",
+      sportTag: undefined,
+      membersCount: undefined,
+      winRatePct: undefined,
+      nextEventSummary: undefined,
       active: g.id === groupId,
     }));
   }, [filteredGroups, groupId]);
@@ -203,13 +217,26 @@ export default function GroupPage() {
           filter={groupFilter}
           onFilterChange={(v) => setGroupFilter(v as 'all')}
         />
-        {message && <p style={{ color: '#0a6', margin: '4px 0 12px' }}>{message}</p>}
+        {message && (
+          <div style={{ margin: '6px 0 12px' }}>
+            <Alert tone={message.toLowerCase().includes('error') || message.toLowerCase().includes('fail') ? 'error' : 'success'}>
+              {message}
+            </Alert>
+          </div>
+        )}
       </div>
 
-      {/* New: browse grid (keeps right-rail list intact) */}
+      {/* Browse grid with skeletons */}
       <SectionCard title="Browse your groups">
-        {gridCards.length === 0 ? (
-          <div>No groups match your search.</div>
+        {loadingGroups ? (
+          <GroupsGridSkeleton count={6} />
+        ) : gridCards.length === 0 ? (
+          <EmptyState
+            title="No groups match your search"
+            text="Try clearing your filters or create a new group."
+            actionText={searchQ ? "Clear search" : undefined}
+            onAction={searchQ ? () => setSearchQ('') : undefined}
+          />
         ) : (
           <GroupsGrid
             groups={gridCards}
@@ -225,7 +252,7 @@ export default function GroupPage() {
         )}
       </SectionCard>
 
-      {/* Details for the selected group (unchanged) */}
+      {/* Details for the selected group (members skeletons) */}
       <SectionCard>
         {!selectedGroup ? (
           <div>Select a group from the grid or sidebar to view its details.</div>
@@ -258,9 +285,13 @@ export default function GroupPage() {
             <hr style={{ margin: '1rem 0' }} />
 
             <h4 style={{ marginTop: 0 }}>Members</h4>
-            {loadingMembers && <div>Loading members…</div>}
-            {!loadingMembers && members.length === 0 && <div>No members yet.</div>}
-            {!loadingMembers && members.length > 0 && (
+            {loadingMembers ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <EmptyState title="Loading members…" text="" />
+              </div>
+            ) : members.length === 0 ? (
+              <EmptyState title="No members yet" text="Invite your friends with the group code." />
+            ) : (
               <ul style={{ paddingLeft: 16, margin: 0 }}>
                 {members.map(m => (
                   <li key={m.id}>
@@ -323,10 +354,18 @@ export default function GroupPage() {
         </div>
       </SectionCard>
 
-      {/* Your Groups list (filtered view) */}
+      {/* Your Groups list (skeleton / empty / items) */}
       <SectionCard title="Your Groups">
-        {filteredGroups.length === 0 && <div>No groups match your search.</div>}
-        {filteredGroups.length > 0 && (
+        {loadingGroups ? (
+          <GroupListSkeleton rows={6} />
+        ) : filteredGroups.length === 0 ? (
+          <EmptyState
+            title="No groups found"
+            text={searchQ ? "No results for your search." : "Create or join a group to get started."}
+            actionText={searchQ ? "Clear search" : undefined}
+            onAction={searchQ ? () => setSearchQ('') : undefined}
+          />
+        ) : (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {filteredGroups.map(g => {
               const active = g.id === groupId;
