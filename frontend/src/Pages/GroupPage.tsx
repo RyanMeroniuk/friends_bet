@@ -59,6 +59,9 @@ import StatBadge from '../components/StatBadge';
 import ActivityList from '../components/ActivityList';
 import TipsCard from '../components/TipsCard';
 
+/* NEW: brand badge asset */
+import betLogo from '../resources/bet_logo.png';
+
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [members, setMembers] = useState<GroupMemberResponse[]>([]);
@@ -383,6 +386,11 @@ export default function GroupPage() {
                   <span>•</span>
                   <span>Press <kbd>/</kbd> to search, <kbd>N</kbd> new, <kbd>J</kbd> join</span>
                 </div>
+              </div>
+
+              {/* NEW: decorative brand badge */}
+              <div className="fb-brand-badge" title="FriendsBet">
+                <img src={betLogo} alt="" aria-hidden="true" />
               </div>
             </header>
 

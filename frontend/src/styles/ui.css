@@ -440,3 +440,77 @@
   animation: fb-shimmer 1.1s infinite;
 }
 @keyframes fb-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+/* Brand badge — contained shimmer + scale */
+.fb-brand-badge {
+  width: 110px;
+  height: 110px;
+  display: inline-grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;          /* clip the shimmer */
+  isolation: isolate;        /* prevent bleed to neighbors */
+  border: 0;
+  background: transparent;
+  border-radius: var(--fb-radius);
+  box-shadow: none;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.fb-brand-badge img {
+  max-width: 70%;
+  max-height: 70%;
+  object-fit: contain;
+  display: block;
+  position: relative;
+  z-index: 1;                /* image below the shimmer */
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+/* Scale on hover */
+.fb-brand-badge:hover { transform: scale(1.08); }
+.fb-brand-badge:hover img { transform: scale(1.06); }
+
+/* Shimmer OVER the image, still clipped inside */
+.fb-brand-badge::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;                /* <-- bring above the img */
+  background: linear-gradient(
+    120deg,
+    rgba(255,255,255,0) 25%,
+    rgba(255,255,255,0.55) 50%,
+    rgba(255,255,255,0) 75%
+  );
+  transform: translateX(-130%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.fb-brand-badge:hover::after {
+  animation: fb-brand-shimmer 700ms ease forwards;
+  opacity: 1;
+}
+
+@keyframes fb-brand-shimmer {
+  from { transform: translateX(-130%); }
+  to   { transform: translateX(130%); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .fb-brand-badge,
+  .fb-brand-badge img { transition: none; }
+  .fb-brand-badge:hover { transform: none; }
+  .fb-brand-badge:hover::after { animation: none; opacity: 0; }
+}
+
+/* Hide on very small screens */
+@media (max-width: 640px) {
+  .fb-brand-badge { display: none; }
+}
+
