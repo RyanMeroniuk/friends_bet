@@ -11,11 +11,16 @@ import {
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
 
-/* === Step 1 layout-only wrappers === */
+/* === Step 1 wrappers === */
 import TwoColumn from '../components/TwoColumn';
 import RightRail from '../components/RightRail';
 import SectionCard from '../components/SectionCard';
 import '../styles/groups.css';
+
+/* === Step 2 primitives === */
+import Button from '../components/Button';
+import Input from '../components/Input';
+import '../styles/ui.css';
 
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -144,7 +149,7 @@ export default function GroupPage() {
     }
   }
 
-  /* ====== RENDER (layout-only changes) ====== */
+  /* ====== RENDER (layout + primitives, no logic changes) ====== */
 
   const mainColumn = (
     <>
@@ -173,9 +178,14 @@ export default function GroupPage() {
                   Invite Code: <code>{selectedGroup.inviteCode}</code>
                 </div>
               </div>
-              <button type="button" onClick={() => copyInvite(selectedGroup.inviteCode)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => copyInvite(selectedGroup.inviteCode)}
+              >
                 Copy Invite
-              </button>
+              </Button>
             </header>
 
             <hr style={{ margin: '1rem 0' }} />
@@ -203,79 +213,46 @@ export default function GroupPage() {
       {/* Create Group */}
       <SectionCard title="Create a Group">
         <div style={{ display: 'flex', gap: 8 }}>
-          <input
+          <Input
             placeholder="New group name"
             value={newName}
             onChange={e => setNewName(e.target.value)}
             aria-label="New group name"
-            style={{
-              flex: 1,
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid #d1d5db',
-            }}
+            style={{ flex: 1 }}
           />
-          <button
+          <Button
             type="button"
             onClick={handleCreate}
             disabled={!newName.trim() || !currentUserId}
-            style={{
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid #0f172a',
-              background: '#0f172a',
-              color: 'white',
-              cursor: 'pointer',
-            }}
           >
             Create
-          </button>
+          </Button>
         </div>
       </SectionCard>
 
       {/* Join Group */}
       <SectionCard title="Join by Invite" subtitle="Enter an invite code to join a group">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <input
+          <Input
             placeholder="Invite Code"
             value={inviteCode}
             onChange={e => setInviteCode(e.target.value)}
             aria-label="Invite Code"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid #d1d5db',
-            }}
           />
-          <input
+          <Input
             placeholder="Your User ID (optional)"
             value={joinUserId}
             onChange={e => setJoinUserId(e.target.value)}
             aria-label="User ID"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid #d1d5db',
-            }}
           />
-          <button
+          <Button
             type="button"
             onClick={handleJoin}
             disabled={!inviteCode.trim() || !currentUserId}
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid #0f172a',
-              background: '#0f172a',
-              color: 'white',
-              cursor: 'pointer',
-            }}
+            style={{ width: '100%' }}
           >
             Join
-          </button>
+          </Button>
         </div>
       </SectionCard>
 
@@ -288,22 +265,22 @@ export default function GroupPage() {
               const active = g.id === groupId;
               return (
                 <li key={g.id} style={{ marginBottom: 6 }}>
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={() => selectGroup(g)}
                     onDoubleClick={() => enterGroup(g)}
                     style={{
                       width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      borderRadius: 10,
+                      justifyContent: 'flex-start',
                       border: active ? '1px solid #cfe3ff' : '1px solid #e5e7eb',
                       background: active ? '#eef5ff' : '#ffffff',
-                      cursor: 'pointer',
                     }}
                   >
                     <div style={{ fontWeight: 600 }}>{g.name}</div>
-                    <div style={{ fontSize: 12, color: '#666' }}>Invite: {g.inviteCode}</div>
-                  </button>
+                    <div style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>
+                      Invite: {g.inviteCode}
+                    </div>
+                  </Button>
                 </li>
               );
             })}
