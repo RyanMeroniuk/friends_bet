@@ -30,10 +30,15 @@ import GroupsHeader from '../components/GroupsHeader';
 import GroupsGrid from '../components/GroupsGrid';
 import { GroupCardProps } from '../components/GroupCard';
 
-/* Step 5 skeletons + optional alert */
+/* Step 5 skeletons + alert */
 import GroupsGridSkeleton from '../components/GroupsGridSkeleton';
 import GroupListSkeleton from '../components/GroupListSkeleton';
 import Alert from '../components/Alert';
+
+/* Step 6 micro-polish */
+import { ToastContainer, ToastItem } from '../components/Toast';
+import FormField from '../components/FormField';
+import Avatar from '../components/Avatar';
 
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -43,18 +48,27 @@ export default function GroupPage() {
   const [joinUserId, setJoinUserId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(false);
-
-  /* NEW (UI-only): show skeletons while fetching groups */
-  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [loadingGroups, setLoadingGroups] = useState(false); // UI-only
 
   /* Step 3 UI state */
   const [searchQ, setSearchQ] = useState('');
   const [groupFilter, setGroupFilter] = useState<'all'>('all');
 
+  /* Step 6 UI-only toast state */
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  function pushToast(text: string, tone: ToastItem["tone"] = "info") {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((prev) => [...prev, { id, text, tone }]);
+    // Auto-dismiss after 2.5s
+    setTimeout(() => setToasts((prev) => prev.filter(t => t.id !== id)), 2500);
+  }
+  function closeToast(id: string) {
+    setToasts((prev) => prev.filter(t => t.id !== id));
+  }
+
   const { groupId, setGroupId } = useGroup();
   const { user } = useAuth();
   const navigate = useNavigate();
-
   const currentUserId: string = user?.id ?? '';
 
   useEffect(() => {
@@ -65,7 +79,7 @@ export default function GroupPage() {
     if (!currentUserId) return;
     (async () => {
       try {
-        setLoadingGroups(true); // UI-only
+        setLoadingGroups(true);
         const mine = await listMyGroups(currentUserId);
         setGroups(mine);
         if (!groupId && mine.length > 0) {
@@ -74,8 +88,9 @@ export default function GroupPage() {
       } catch (err) {
         console.error('Failed to load your groups', err);
         setMessage('Failed to load your groups');
+        pushToast('Failed to load your groups', 'error');
       } finally {
-        setLoadingGroups(false); // UI-only
+        setLoadingGroups(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,6 +114,7 @@ export default function GroupPage() {
       } catch (err) {
         console.error('Failed to load members', err);
         setMessage('Failed to load members');
+        pushToast('Failed to load members', 'error');
         setMembers([]);
       } finally {
         setLoadingMembers(false);
@@ -108,7 +124,7 @@ export default function GroupPage() {
 
   async function reloadGroupsAndStay() {
     if (!currentUserId) return;
-    setLoadingGroups(true); // UI-only
+    setLoadingGroups(true);
     const mine = await listMyGroups(currentUserId);
     setGroups(mine);
     if (mine.length > 0) {
@@ -119,7 +135,7 @@ export default function GroupPage() {
     } else {
       setGroupId(null as any);
     }
-    setLoadingGroups(false); // UI-only
+    setLoadingGroups(false);
   }
 
   async function handleCreate() {
@@ -130,12 +146,16 @@ export default function GroupPage() {
       await joinGroup(grp.inviteCode, currentUserId);
 
       setNewName('');
-      setMessage('Group created and you’ve joined it!');
+      const msg = 'Group created and you’ve joined it!';
+      setMessage(msg);
+      pushToast(msg, 'success');
       await reloadGroupsAndStay();
       setGroupId(grp.id);
     } catch (err: any) {
-      console.error('create/join error:', err.response ?? err);
-      setMessage(err?.response?.data || 'Error creating or joining group');
+      const msg = err?.response?.data || 'Error creating or joining group';
+      console.error('create/join error:', err?.response ?? err);
+      setMessage(msg);
+      pushToast(msg, 'error');
     }
   }
 
@@ -146,12 +166,16 @@ export default function GroupPage() {
       const grp = await joinGroup(inviteCode.trim(), joinUserId.trim() || currentUserId);
       setInviteCode('');
       setJoinUserId(currentUserId || '');
-      setMessage('Successfully joined group!');
+      const msg = 'Successfully joined group!';
+      setMessage(msg);
+      pushToast(msg, 'success');
       await reloadGroupsAndStay();
       setGroupId(grp.id);
     } catch (err: any) {
-      console.error('joinGroup failed:', err.response ?? err);
-      setMessage(err?.response?.data || 'Error joining group');
+      const msg = err?.response?.data || 'Error joining group';
+      console.error('joinGroup failed:', err?.response ?? err);
+      setMessage(msg);
+      pushToast(msg, 'error');
     }
   }
 
@@ -167,14 +191,18 @@ export default function GroupPage() {
   async function copyInvite(code: string) {
     try {
       await navigator.clipboard.writeText(code);
-      setMessage('Invite code copied to clipboard');
+      const msg = 'Invite code copied to clipboard';
+      setMessage(msg);
+      pushToast(msg, 'success');
       setTimeout(() => setMessage(null), 2000);
     } catch {
-      setMessage('Could not copy invite code');
+      const msg = 'Could not copy invite code';
+      setMessage(msg);
+      pushToast(msg, 'error');
     }
   }
 
-  /* Filter for sidebar & grid (unchanged) */
+  /* Filtered view (unchanged) */
   const filteredGroups = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
     let arr = groups;
@@ -185,13 +213,12 @@ export default function GroupPage() {
       );
     }
     if (groupFilter !== 'all') {
-      // placeholder for future tags
       arr = arr;
     }
     return arr;
   }, [groups, searchQ, groupFilter]);
 
-  /* Map to card props (placeholders remain) */
+  /* Cards mapping (unchanged placeholders) */
   const gridCards: GroupCardProps[] = useMemo(() => {
     return filteredGroups.map((g) => ({
       id: g.id,
@@ -226,7 +253,6 @@ export default function GroupPage() {
         )}
       </div>
 
-      {/* Browse grid with skeletons */}
       <SectionCard title="Browse your groups">
         {loadingGroups ? (
           <GroupsGridSkeleton count={6} />
@@ -252,7 +278,6 @@ export default function GroupPage() {
         )}
       </SectionCard>
 
-      {/* Details for the selected group (members skeletons) */}
       <SectionCard>
         {!selectedGroup ? (
           <div>Select a group from the grid or sidebar to view its details.</div>
@@ -292,10 +317,25 @@ export default function GroupPage() {
             ) : members.length === 0 ? (
               <EmptyState title="No members yet" text="Invite your friends with the group code." />
             ) : (
-              <ul style={{ paddingLeft: 16, margin: 0 }}>
+              <ul style={{ paddingLeft: 0, margin: 0, display: 'grid', gap: 8 }}>
                 {members.map(m => (
-                  <li key={m.id}>
-                    {m.username} — joined {new Date(m.joinedAt).toLocaleString()}
+                  <li key={m.id} style={{
+                    listStyle: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '8px 10px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 10,
+                    background: '#fff',
+                  }}>
+                    <Avatar name={m.username} />
+                    <div style={{ display: 'grid' }}>
+                      <span style={{ fontWeight: 600 }}>{m.username}</span>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>
+                        joined {new Date(m.joinedAt).toLocaleString()}
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -310,51 +350,69 @@ export default function GroupPage() {
     <RightRail>
       {/* Create Group */}
       <SectionCard title="Create a Group">
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Input
-            placeholder="New group name"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            aria-label="New group name"
-            style={{ flex: 1 }}
-          />
-          <Button
-            type="button"
-            onClick={handleCreate}
-            disabled={!newName.trim() || !currentUserId}
+        <div style={{ display: 'grid', gap: 8 }}>
+          <FormField
+            label="Group name"
+            htmlFor="new-group"
+            helperText="Choose something recognizable to your friends."
           >
-            Create
-          </Button>
+            {/* Input + Button grouped so they share height */}
+            <div className="fb-input-group">
+              <Input
+                id="new-group"
+                placeholder="New group name"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                aria-label="New group name"
+              />
+              <Button
+                size="md"                 // same vertical padding as the input
+                type="button"
+                onClick={handleCreate}
+                disabled={!newName.trim() || !currentUserId}
+                title={!currentUserId ? "Sign in to create groups" : undefined}
+              >
+                Create
+              </Button>
+            </div>
+          </FormField>
         </div>
       </SectionCard>
 
       {/* Join Group */}
       <SectionCard title="Join by Invite" subtitle="Enter an invite code to join a group">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Input
-            placeholder="Invite Code"
-            value={inviteCode}
-            onChange={e => setInviteCode(e.target.value)}
-            aria-label="Invite Code"
-          />
-          <Input
-            placeholder="Your User ID (optional)"
-            value={joinUserId}
-            onChange={e => setJoinUserId(e.target.value)}
-            aria-label="User ID"
-          />
+        <div style={{ display: 'grid', gap: 8 }}>
+          <FormField label="Invite code" htmlFor="invite-code" helperText="Ask a friend for the code, then paste it here.">
+            <Input
+              id="invite-code"
+              placeholder="Invite Code"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value)}
+              aria-label="Invite Code"
+            />
+          </FormField>
+          <FormField label="Your user ID (optional)" htmlFor="user-id" helperText="Pre-filled from your account. Change only if needed.">
+            <Input
+              id="user-id"
+              placeholder="Your User ID (optional)"
+              value={joinUserId}
+              onChange={e => setJoinUserId(e.target.value)}
+              aria-label="User ID"
+            />
+          </FormField>
           <Button
             type="button"
             onClick={handleJoin}
             disabled={!inviteCode.trim() || !currentUserId}
             style={{ width: '100%' }}
+            title={!currentUserId ? "Sign in to join groups" : undefined}
           >
             Join
           </Button>
         </div>
       </SectionCard>
 
-      {/* Your Groups list (skeleton / empty / items) */}
+      {/* Your Groups list */}
       <SectionCard title="Your Groups">
         {loadingGroups ? (
           <GroupListSkeleton rows={6} />
@@ -396,5 +454,11 @@ export default function GroupPage() {
     </RightRail>
   );
 
-  return <TwoColumn main={mainColumn} right={rightRail} />;
+  return (
+    <>
+      <TwoColumn main={mainColumn} right={rightRail} />
+      {/* Step 6: Toasts */}
+      <ToastContainer items={toasts} onClose={closeToast} />
+    </>
+  );
 }
