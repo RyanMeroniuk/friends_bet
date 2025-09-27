@@ -11,6 +11,12 @@ import {
 import { useGroup } from '../context/GroupContext';
 import { useAuth } from '../context/AuthContext';
 
+/* === Step 1 layout-only wrappers === */
+import TwoColumn from '../components/TwoColumn';
+import RightRail from '../components/RightRail';
+import SectionCard from '../components/SectionCard';
+import '../styles/groups.css';
+
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [members, setMembers] = useState<GroupMemberResponse[]>([]);
@@ -138,119 +144,174 @@ export default function GroupPage() {
     }
   }
 
-  const layout: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '280px 1fr',
-    gap: '1.25rem',
-    alignItems: 'start',
-    padding: '1.5rem',
-  };
-  const card: React.CSSProperties = {
-    border: '1px solid #ddd',
-    borderRadius: 8,
-    padding: '1rem',
-    background: '#fff',
-  };
-  const listItem = (active: boolean): React.CSSProperties => ({
-    padding: '0.5rem 0.6rem',
-    borderRadius: 6,
-    cursor: 'pointer',
-    background: active ? '#eef5ff' : 'transparent',
-    border: active ? '1px solid #cfe3ff' : '1px solid transparent',
-    marginBottom: 6,
-  });
+  /* ====== RENDER (layout-only changes) ====== */
 
-  return (
-    <div style={{ maxWidth: 1100, margin: '1.75rem auto' }}>
-      <h2>Your Groups</h2>
-      {message && <p style={{ color: '#0a6' }}>{message}</p>}
-
-      <div style={layout}>
-        <aside style={card}>
-          <h3 style={{ marginTop: 0 }}>Create a Group</h3>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              placeholder="New group name"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button type="button" onClick={handleCreate} disabled={!newName.trim() || !currentUserId}>
-              Create
-            </button>
-          </div>
-
-          <hr style={{ margin: '1rem 0' }} />
-
-          <h3>Join by Invite</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input
-              placeholder="Invite Code"
-              value={inviteCode}
-              onChange={e => setInviteCode(e.target.value)}
-            />
-            <input
-              placeholder="Your User ID (optional)"
-              value={joinUserId}
-              onChange={e => setJoinUserId(e.target.value)}
-            />
-            <button type="button" onClick={handleJoin} disabled={!inviteCode.trim() || !currentUserId}>
-              Join
-            </button>
-          </div>
-
-          <hr style={{ margin: '1rem 0' }} />
-
-          <h3>Your Groups</h3>
-          {groups.length === 0 && <div>No groups yet.</div>}
-          {groups.map(g => (
-            <div
-              key={g.id}
-              style={listItem(g.id === groupId)}
-              onClick={() => selectGroup(g)}
-              onDoubleClick={() => enterGroup(g)}
-            >
-              <div style={{ fontWeight: 600 }}>{g.name}</div>
-              <div style={{ fontSize: 12, color: '#666' }}>Invite: {g.inviteCode}</div>
-            </div>
-          ))}
-        </aside>
-
-        <section style={card}>
-          {!selectedGroup ? (
-            <div>Select a group to view its members.</div>
-          ) : (
-            <>
-              <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>{selectedGroup.name}</h3>
-                  <div style={{ fontSize: 13, color: '#666' }}>
-                    Invite Code: <code>{selectedGroup.inviteCode}</code>
-                  </div>
-                </div>
-                <button type="button" onClick={() => copyInvite(selectedGroup.inviteCode)}>
-                  Copy Invite
-                </button>
-              </header>
-
-              <hr style={{ margin: '1rem 0' }} />
-
-              <h4 style={{ marginTop: 0 }}>Members</h4>
-              {loadingMembers && <div>Loading members…</div>}
-              {!loadingMembers && members.length === 0 && <div>No members yet.</div>}
-              {!loadingMembers && members.length > 0 && (
-                <ul style={{ paddingLeft: 16 }}>
-                  {members.map(m => (
-                    <li key={m.id}>
-                      {m.username} — joined {new Date(m.joinedAt).toLocaleString()}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </section>
+  const mainColumn = (
+    <>
+      <div>
+        <h1 className="fb-page-title">Your Groups</h1>
+        <p className="fb-page-subtitle">Select a group to view its members.</p>
+        {message && <p style={{ color: '#0a6', marginTop: 8 }}>{message}</p>}
       </div>
-    </div>
+
+      <SectionCard>
+        {!selectedGroup ? (
+          <div>Select a group from the sidebar to view its details.</div>
+        ) : (
+          <>
+            <header
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0 }}>{selectedGroup.name}</h3>
+                <div style={{ fontSize: 13, color: '#666' }}>
+                  Invite Code: <code>{selectedGroup.inviteCode}</code>
+                </div>
+              </div>
+              <button type="button" onClick={() => copyInvite(selectedGroup.inviteCode)}>
+                Copy Invite
+              </button>
+            </header>
+
+            <hr style={{ margin: '1rem 0' }} />
+
+            <h4 style={{ marginTop: 0 }}>Members</h4>
+            {loadingMembers && <div>Loading members…</div>}
+            {!loadingMembers && members.length === 0 && <div>No members yet.</div>}
+            {!loadingMembers && members.length > 0 && (
+              <ul style={{ paddingLeft: 16, margin: 0 }}>
+                {members.map(m => (
+                  <li key={m.id}>
+                    {m.username} — joined {new Date(m.joinedAt).toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </SectionCard>
+    </>
   );
+
+  const rightRail = (
+    <RightRail>
+      {/* Create Group */}
+      <SectionCard title="Create a Group">
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            placeholder="New group name"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            aria-label="New group name"
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #d1d5db',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={!newName.trim() || !currentUserId}
+            style={{
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #0f172a',
+              background: '#0f172a',
+              color: 'white',
+              cursor: 'pointer',
+            }}
+          >
+            Create
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* Join Group */}
+      <SectionCard title="Join by Invite" subtitle="Enter an invite code to join a group">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input
+            placeholder="Invite Code"
+            value={inviteCode}
+            onChange={e => setInviteCode(e.target.value)}
+            aria-label="Invite Code"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #d1d5db',
+            }}
+          />
+          <input
+            placeholder="Your User ID (optional)"
+            value={joinUserId}
+            onChange={e => setJoinUserId(e.target.value)}
+            aria-label="User ID"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #d1d5db',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleJoin}
+            disabled={!inviteCode.trim() || !currentUserId}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #0f172a',
+              background: '#0f172a',
+              color: 'white',
+              cursor: 'pointer',
+            }}
+          >
+            Join
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* Your Groups list */}
+      <SectionCard title="Your Groups">
+        {groups.length === 0 && <div>No groups yet.</div>}
+        {groups.length > 0 && (
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {groups.map(g => {
+              const active = g.id === groupId;
+              return (
+                <li key={g.id} style={{ marginBottom: 6 }}>
+                  <button
+                    onClick={() => selectGroup(g)}
+                    onDoubleClick={() => enterGroup(g)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: active ? '1px solid #cfe3ff' : '1px solid #e5e7eb',
+                      background: active ? '#eef5ff' : '#ffffff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{g.name}</div>
+                    <div style={{ fontSize: 12, color: '#666' }}>Invite: {g.inviteCode}</div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </SectionCard>
+    </RightRail>
+  );
+
+  return <TwoColumn main={mainColumn} right={rightRail} />;
 }

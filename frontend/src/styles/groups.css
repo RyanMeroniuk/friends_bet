@@ -1,0 +1,98 @@
+/* Namespaced to avoid clashing with existing styles */
+:root {
+  --fb-bg: #f7f8fb;
+  --fb-card-bg: #ffffff;
+  --fb-border: #e7e9ee;
+  --fb-text: #0f172a;
+  --fb-muted: #64748b;
+  --fb-radius: 14px;
+  --fb-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --fb-space: 16px;
+  --fb-space-lg: 24px;
+  --fb-maxw: 1200px;
+  --fb-rail-w: 360px;
+}
+
+/* Page container */
+.fb-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--fb-bg);
+}
+
+/* Grid: main + aside */
+.fb-grid {
+  width: 100%;
+  max-width: var(--fb-maxw);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+/* Desktop: add right rail */
+@media (min-width: 1024px) {
+  .fb-grid {
+    grid-template-columns: minmax(0, 1fr) var(--fb-rail-w);
+    align-items: start;
+  }
+}
+
+.fb-main {
+  min-width: 0;
+}
+
+.fb-aside {
+  min-width: 0;
+}
+
+/* Right rail stack */
+.fb-rail > * + * {
+  margin-top: 16px;
+}
+
+/* Card */
+.fb-card {
+  background: var(--fb-card-bg);
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
+  box-shadow: var(--fb-shadow);
+}
+
+.fb-card-header {
+  padding: var(--fb-space-lg) var(--fb-space-lg) 8px var(--fb-space-lg);
+  border-bottom: 1px solid var(--fb-border);
+}
+
+.fb-card-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+  color: var(--fb-text);
+  font-weight: 600;
+}
+
+.fb-card-subtitle {
+  margin: 6px 0 0 0;
+  color: var(--fb-muted);
+  font-size: 14px;
+}
+
+.fb-card-body {
+  padding: var(--fb-space-lg);
+}
+
+/* Simple page section title (top of main column) */
+.fb-page-title {
+  margin: 0 0 6px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--fb-text);
+}
+
+.fb-page-subtitle {
+  margin: 0 0 16px 0;
+  color: var(--fb-muted);
+  font-size: 14px;
+}
