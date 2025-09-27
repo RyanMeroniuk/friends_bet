@@ -40,6 +40,10 @@ import { ToastContainer, ToastItem } from '../components/Toast';
 import FormField from '../components/FormField';
 import Avatar from '../components/Avatar';
 
+/* Step 7 info cards */
+import HowItWorksCard from '../components/HowItWorksCard';
+import PopularSportsCard from '../components/PopularSportsCard';
+
 export default function GroupPage() {
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [members, setMembers] = useState<GroupMemberResponse[]>([]);
@@ -59,7 +63,6 @@ export default function GroupPage() {
   function pushToast(text: string, tone: ToastItem["tone"] = "info") {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     setToasts((prev) => [...prev, { id, text, tone }]);
-    // Auto-dismiss after 2.5s
     setTimeout(() => setToasts((prev) => prev.filter(t => t.id !== id)), 2500);
   }
   function closeToast(id: string) {
@@ -218,7 +221,7 @@ export default function GroupPage() {
     return arr;
   }, [groups, searchQ, groupFilter]);
 
-  /* Cards mapping (unchanged placeholders) */
+  /* Cards mapping (placeholders) */
   const gridCards: GroupCardProps[] = useMemo(() => {
     return filteredGroups.map((g) => ({
       id: g.id,
@@ -356,7 +359,6 @@ export default function GroupPage() {
             htmlFor="new-group"
             helperText="Choose something recognizable to your friends."
           >
-            {/* Input + Button grouped so they share height */}
             <div className="fb-input-group">
               <Input
                 id="new-group"
@@ -366,7 +368,7 @@ export default function GroupPage() {
                 aria-label="New group name"
               />
               <Button
-                size="md"                 // same vertical padding as the input
+                size="md"
                 type="button"
                 onClick={handleCreate}
                 disabled={!newName.trim() || !currentUserId}
@@ -383,14 +385,27 @@ export default function GroupPage() {
       <SectionCard title="Join by Invite" subtitle="Enter an invite code to join a group">
         <div style={{ display: 'grid', gap: 8 }}>
           <FormField label="Invite code" htmlFor="invite-code" helperText="Ask a friend for the code, then paste it here.">
-            <Input
-              id="invite-code"
-              placeholder="Invite Code"
-              value={inviteCode}
-              onChange={e => setInviteCode(e.target.value)}
-              aria-label="Invite Code"
-            />
+            {/* Input + Button grouped to match height/shape */}
+            <div className="fb-input-group">
+              <Input
+                id="invite-code"
+                placeholder="Invite Code"
+                value={inviteCode}
+                onChange={e => setInviteCode(e.target.value)}
+                aria-label="Invite Code"
+              />
+              <Button
+                size="md"
+                type="button"
+                onClick={handleJoin}
+                disabled={!inviteCode.trim() || !currentUserId}
+                title={!currentUserId ? "Sign in to join groups" : undefined}
+              >
+                Join
+              </Button>
+            </div>
           </FormField>
+
           <FormField label="Your user ID (optional)" htmlFor="user-id" helperText="Pre-filled from your account. Change only if needed.">
             <Input
               id="user-id"
@@ -400,15 +415,6 @@ export default function GroupPage() {
               aria-label="User ID"
             />
           </FormField>
-          <Button
-            type="button"
-            onClick={handleJoin}
-            disabled={!inviteCode.trim() || !currentUserId}
-            style={{ width: '100%' }}
-            title={!currentUserId ? "Sign in to join groups" : undefined}
-          >
-            Join
-          </Button>
         </div>
       </SectionCard>
 
@@ -451,13 +457,16 @@ export default function GroupPage() {
           </ul>
         )}
       </SectionCard>
+
+      {/* Step 7: Info cards */}
+      <HowItWorksCard />
+      <PopularSportsCard />
     </RightRail>
   );
 
   return (
     <>
       <TwoColumn main={mainColumn} right={rightRail} />
-      {/* Step 6: Toasts */}
       <ToastContainer items={toasts} onClose={closeToast} />
     </>
   );

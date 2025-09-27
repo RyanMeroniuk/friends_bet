@@ -188,3 +188,23 @@
   padding-left: 14px;     /* matches .fb-btn--md horizontal padding */
   padding-right: 14px;
 }
+/* Simple bullet list with better spacing */
+.fb-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 0px;
+  display: grid;
+  gap: 6px;
+  color: var(--fb-text);
+}
+.fb-list li { line-height: 1.35; }
+
+/* Key/Value compact rows (for Popular Sports) */
+.fb-kv { display: grid; gap: 6px; }
+.fb-kv__row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px dashed #e5e7eb; padding: 6px 0;
+}
+.fb-kv__row:last-child { border-bottom: none; }
+.fb-kv__label { color: var(--fb-text); font-weight: 600; }
+.fb-kv__value { color: var(--fb-muted); font-size: 12px; }
