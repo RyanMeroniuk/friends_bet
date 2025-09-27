@@ -1,3 +1,4 @@
+// frontend/src/Pages/MainPage.tsx
 import React from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import {
@@ -9,9 +10,9 @@ import {
   Toolbar,
   Typography,
   AppBar,
+  GlobalStyles,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
-import '../styles/ui.css';
 
 export default function MainPage() {
   const { user, logout } = useAuth();
@@ -24,95 +25,64 @@ export default function MainPage() {
 
   const copyId = async () => {
     if (!user?.id) return;
-    try {
-      await navigator.clipboard.writeText(user.id);
-    } catch {
-      /* ignore */
-    }
+    try { await navigator.clipboard.writeText(user.id); } catch {}
   };
 
-  if (!user) {
-    return <div style={{ padding: '2rem' }}>Loading user…</div>;
-  }
+  if (!user) return <div style={{ padding: '2rem' }}>Loading user…</div>;
 
   const drawerWidth = 240;
 
   return (
     <Box sx={{ display: 'flex' }}>
+      {/* Force the left drawer background no matter what the theme does */}
+      <GlobalStyles
+        styles={{
+          '.MuiDrawer-paper': {
+            backgroundColor: 'var(--fb-bg, #f7f8fb) !important',
+            backgroundImage: 'none !important',
+            boxSizing: 'border-box',
+            borderRight: '1px solid var(--fb-border)',
+          },
+        }}
+      />
+
       <AppBar
         position="fixed"
-        elevation={1}
         sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          backgroundColor: 'var(--fb-cl-navy)',
-          color: '#fff',
-          borderBottom: '1px solid rgba(0,0,0,0.08)',
-          boxShadow: '0 2px 10px rgba(1,50,55,0.15)',
+          zIndex: (t) => t.zIndex.drawer + 1,
+          backgroundColor: 'var(--fb-deep)', // top bar color from your CSS vars
         }}
       >
-        <Toolbar sx={{ minHeight: 64 }}>
-          {/* Left: Brand/title */}
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Toolbar sx={{ width: '100%' }}>
+          <Typography variant="h6" sx={{ mr: 2 }}>
             FriendsBet
           </Typography>
 
-          {/* Push everything else to the right */}
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body1" sx={{ opacity: 0.95 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Typography variant="body1" sx={{ ml: 2 }}>
               {user.username}
             </Typography>
-
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            <Typography variant="body2" sx={{ mx: 2 }}>
               ({user.email})
             </Typography>
-
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+            <Typography variant="body2" sx={{ mr: 1 }}>
               ID: <code>{user.id}</code>
             </Typography>
-
-            <button
-              onClick={copyId}
-              className="fb-btn fb-btn--ghost fb-btn--sm"
-              title="Copy your user ID"
-            >
-              Copy ID
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="fb-btn fb-btn--ghost fb-btn--sm"
-              title="Sign out"
-            >
-              Logout
-            </button>
-          </Box>
+            <button onClick={copyId} style={{ marginRight: 12 }}>Copy ID</button>
+            <button onClick={handleLogout}>Logout</button>
+          </div>
         </Toolbar>
       </AppBar>
 
       <Drawer
         variant="permanent"
         sx={{
-          width: 240,
+          width: drawerWidth,
+          flexShrink: 0,
           '& .MuiDrawer-paper': {
-            width: 240,
-            boxSizing: 'border-box',
-            mt: 8,
-            backgroundColor: '#EFD8CD',     // darker than cream
-            borderRight: '1px solid #E6C6BA',
+            width: drawerWidth,
+            mt: 8, // below app bar
           },
-
-          '& .MuiListItemButton-root': {
-            borderRadius: '10px',
-            margin: '4px 8px',
-            color: '#013237',                // deep navy/teal
-            '&:hover': {
-              backgroundColor: 'rgba(254, 151, 156, 0.18)', // a touch stronger on darker bg
-            },
-            '&.Mui-selected, &.Mui-selected:hover': {
-              backgroundColor: 'rgba(254, 151, 156, 0.28)',
-            },
-          },
-          '& .MuiListItemText-primary': { fontWeight: 600 },
         }}
       >
         <List>
@@ -127,8 +97,6 @@ export default function MainPage() {
           </ListItemButton>
         </List>
       </Drawer>
-
-
 
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
         <Toolbar />
