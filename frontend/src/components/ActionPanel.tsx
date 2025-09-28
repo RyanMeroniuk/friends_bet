@@ -62,7 +62,7 @@ export default function ActionPanel({
           onClick={() => onSubmit?.(parsed)}
           disabled={parsed <= 0}
         >
-          {ctaLabel.replace('$0', `$${(parsed / 100).toFixed(0)}`)}
+          {ctaLabel.replace('$0', `$${(parsed / 100).toFixed(2)}`)}
         </Button>
       </div>
     </div>

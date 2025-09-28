@@ -32,6 +32,7 @@ import WalletSecurityCard from '../components/WalletSecurityCard';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
 import { listMyGroups, GroupResponse } from '../api/group';
+import { getMyBalance, deposit as depositFunds } from '../api/wallet';
 
 type TxnItem = {
   id: string;
@@ -118,28 +119,23 @@ export default function WalletPage() {
   const [loadingTxns, setLoadingTxns] = React.useState<boolean>(false);
 
   const [summary, setSummary] = React.useState({
-    current: 75,
-    available: 50,
-    pending: 25,
+    current: 0,
+    available: 0,
+    pending: 0,
   });
 
-  const [txns, setTxns] = React.useState<TxnItem[]>([
-    { id: 't1', ts: Date.now() - 1000 * 60 * 40, label: 'Deposit',    amount: +50.0 },
-    { id: 't2', ts: Date.now() - 1000 * 60 * 160, label: 'Bet placed', amount: -20.0 },
-    { id: 't3', ts: Date.now() - 1000 * 60 * 60 * 28, label: 'Winnings', amount: +15.0 },
-    { id: 't4', ts: Date.now() - 1000 * 60 * 10, label: 'Withdraw',   amount: -5.0 },
-  ]);
+  const [txns, setTxns] = React.useState<TxnItem[]>([]);
 
   // Toasts
   const [toasts, setToasts] = React.useState<ToastItem[]>([]);
-  function pushToast(text: string, tone: ToastItem['tone'] = 'info') {
+  const pushToast = React.useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     setToasts((prev) => [...prev, { id, text, tone }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2400);
-  }
-  function closeToast(id: string) {
+  }, []);
+  const closeToast = React.useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  }
+  }, []);
 
   // last refreshed + shortcuts
   const [lastRefreshed, setLastRefreshed] = React.useState<number>(Date.now());
@@ -149,9 +145,18 @@ export default function WalletPage() {
   const [depositOpen, setDepositOpen] = React.useState(false);
   const [withdrawOpen, setWithdrawOpen] = React.useState(false);
   const [amount, setAmount] = React.useState<string>('25'); // editable field
+  const [depositSubmitting, setDepositSubmitting] = React.useState(false);
   const parsedAmount = Number(amount) || 0;
+  const parsedAmountCents = Math.round(parsedAmount * 100);
   const withdrawInvalid = parsedAmount <= 0 || parsedAmount > summary.available;
-  const depositInvalid = parsedAmount <= 0;
+  const depositInvalid = parsedAmount <= 0 || parsedAmountCents <= 0 || !selectedId || !currentUserId;
+  const depositDisabledReason = !selectedId
+    ? 'Select a group before depositing'
+    : !currentUserId
+    ? 'Sign in to deposit funds'
+    : parsedAmount <= 0 || parsedAmountCents <= 0
+    ? 'Enter an amount greater than $0'
+    : undefined;
 
   // Filters + search
   const [txnFilter, setTxnFilter] = React.useState<TxnFilter>('all');
@@ -177,43 +182,45 @@ export default function WalletPage() {
     return arr;
   }, [txns, txnFilter, txnSearch]);
 
-  // Simulated refresh on group change (until wallet endpoints are available)
-  React.useEffect(() => {
-    if (!selectedId) return;
+  const fetchSummary = React.useCallback(async () => {
+    if (!selectedId || !currentUserId) return false;
 
     setLoadingSummary(true);
-    setLoadingTxns(true);
-
-    const t1 = setTimeout(() => {
-      setSummary({ current: 75, available: 50, pending: 25 });
-      setLoadingSummary(false);
+    try {
+      const balanceCents = await getMyBalance(selectedId, currentUserId);
+      const balanceDollars = balanceCents / 100;
+      setSummary({
+        current: balanceDollars,
+        available: balanceDollars,
+        pending: 0,
+      });
       setLastRefreshed(Date.now());
-    }, 700);
-
-    const t2 = setTimeout(() => {
-      setTxns((prev) => prev);
+      return true;
+    } catch (err) {
+      console.error('Failed to load wallet summary:', err);
+      pushToast('Unable to load wallet balance right now.', 'error');
+      return false;
+    } finally {
+      setLoadingSummary(false);
       setLoadingTxns(false);
-    }, 900);
+    }
+  }, [selectedId, currentUserId, pushToast]);
 
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [selectedId]);
+  React.useEffect(() => {
+    if (!selectedId || !currentUserId) return;
+    void fetchSummary();
+  }, [fetchSummary, selectedId, currentUserId]);
 
-  function handleRefresh() {
-    setLoadingSummary(true);
-    setLoadingTxns(true);
-    setTimeout(() => {
-      setLoadingSummary(false);
-      setLastRefreshed(Date.now());
-    }, 600);
-    setTimeout(() => setLoadingTxns(false), 800);
-    pushToast('Wallet refreshed', 'success');
-  }
+  const handleRefresh = React.useCallback(() => {
+    if (!selectedId || !currentUserId) return;
+    fetchSummary().then((ok) => {
+      if (ok) pushToast('Wallet refreshed', 'success');
+    });
+  }, [currentUserId, fetchSummary, pushToast, selectedId]);
 
-  function handleDeposit() {
-    setAmount('25');
+  function handleDeposit(amountCents: number) {
+    if (amountCents <= 0) return;
+    setAmount((amountCents / 100).toString());
     setDepositOpen(true);
   }
   function handleWithdraw() {
@@ -221,11 +228,41 @@ export default function WalletPage() {
     setWithdrawOpen(true);
   }
 
-  function confirmDeposit() {
-    if (depositInvalid) return;
-    setDepositOpen(false);
-    pushToast(`Deposited $${parsedAmount.toFixed(2)} to ${selectedName}`, 'success');
-    // Future: call deposit API then refresh
+  async function confirmDeposit() {
+    if (depositInvalid || depositSubmitting || !selectedId || !currentUserId) return;
+
+    try {
+      setDepositSubmitting(true);
+      const amountCents = Math.max(0, parsedAmountCents);
+      const amountDollars = amountCents / 100;
+      if (amountCents <= 0) {
+        pushToast('Enter an amount greater than $0.01.', 'error');
+        return;
+      }
+      const resp = await depositFunds(selectedId, currentUserId, amountCents);
+      const updatedBalance = resp.balanceCents / 100;
+
+      setSummary((prev) => ({ current: updatedBalance, available: updatedBalance, pending: prev.pending }));
+      setLastRefreshed(Date.now());
+      setTxns((prev) => [
+        {
+          id: `${resp.userId}_deposit_${Date.now()}`,
+          ts: Date.now(),
+          label: 'Deposit',
+          amount: amountDollars,
+        },
+        ...prev,
+      ]);
+
+      setDepositOpen(false);
+      setAmount('');
+      pushToast(`Deposited $${amountDollars.toFixed(2)} to ${selectedName}`, 'success');
+    } catch (err) {
+      console.error('Failed to deposit funds:', err);
+      pushToast('Unable to deposit funds right now.', 'error');
+    } finally {
+      setDepositSubmitting(false);
+    }
   }
   function confirmWithdraw() {
     if (withdrawInvalid) return;
@@ -508,10 +545,17 @@ export default function WalletPage() {
             <button
               className="fb-btn fb-btn--primary fb-btn--md"
               onClick={confirmDeposit}
-              disabled={depositInvalid}
-              title={depositInvalid ? 'Enter an amount greater than $0' : undefined}
+              disabled={depositInvalid || depositSubmitting}
+              aria-busy={depositSubmitting}
+              title={
+                depositInvalid
+                  ? depositDisabledReason
+                  : depositSubmitting
+                  ? 'Processing deposit'
+                  : undefined
+              }
             >
-              Confirm
+              {depositSubmitting ? 'Processing…' : 'Confirm'}
             </button>
           </>
         }
