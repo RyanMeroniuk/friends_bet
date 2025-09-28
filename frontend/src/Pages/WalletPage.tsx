@@ -21,9 +21,6 @@ import WalletStatsSkeleton from '../components/WalletStatsSkeleton';
 import ActionPanelSkeleton from '../components/ActionPanelSkeleton';
 import TxnListSkeleton from '../components/TxnListSkeleton';
 
-/* toasts */
-import { ToastContainer, ToastItem } from '../components/Toast';
-
 /* right-rail info cards */
 import FundingTipsCard from '../components/FundingTipsCard';
 import WalletSecurityCard from '../components/WalletSecurityCard';
@@ -148,7 +145,6 @@ export default function WalletPage() {
     setGroups((prev) => prev.map((x) => ({ ...x, active: x.id === id })));
     setGroupId(id);
     localStorage.setItem(LS_SELECTED_GROUP, id);
-    pushToast(`Switched to "${groups.find((g) => g.id === id)?.name ?? 'group'}"`, 'info');
   }
 
   // === Wallet summary + txns (UI-only placeholders for now) ===
@@ -162,17 +158,6 @@ export default function WalletPage() {
   });
 
   const [txns, setTxns] = React.useState<TxnItem[]>([]);
-
-  // Toasts
-  const [toasts, setToasts] = React.useState<ToastItem[]>([]);
-  const pushToast = React.useCallback((text: string, tone: ToastItem['tone'] = 'info') => {
-    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    setToasts((prev) => [...prev, { id, text, tone }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2400);
-  }, []);
-  const closeToast = React.useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
 
   // last refreshed + shortcuts
   const [lastRefreshed, setLastRefreshed] = React.useState<number>(Date.now());
@@ -238,13 +223,12 @@ export default function WalletPage() {
       return true;
     } catch (err) {
       console.error('Failed to load wallet summary:', err);
-      pushToast('Unable to load wallet balance right now.', 'error');
       return false;
     } finally {
       setLoadingSummary(false);
       setLoadingTxns(false);
     }
-  }, [selectedId, currentUserId, pushToast]);
+  }, [selectedId, currentUserId]);
 
   React.useEffect(() => {
     if (!selectedId || !currentUserId) return;
@@ -253,10 +237,8 @@ export default function WalletPage() {
 
   const handleRefresh = React.useCallback(() => {
     if (!selectedId || !currentUserId) return;
-    fetchSummary().then((ok) => {
-      if (ok) pushToast('Wallet refreshed', 'success');
-    });
-  }, [currentUserId, fetchSummary, pushToast, selectedId]);
+    void fetchSummary();
+  }, [currentUserId, fetchSummary, selectedId]);
 
   function handleDeposit(amountCents: number) {
     if (amountCents <= 0) return;
@@ -271,7 +253,6 @@ export default function WalletPage() {
       const amountCents = Math.max(0, parsedAmountCents);
       const amountDollars = amountCents / 100;
       if (amountCents <= 0) {
-        pushToast('Enter an amount greater than $0.01.', 'error');
         return;
       }
       const resp = await depositFunds(selectedId, currentUserId, amountCents);
@@ -296,10 +277,8 @@ export default function WalletPage() {
 
       setDepositOpen(false);
       setAmount('');
-      pushToast(`Deposited $${amountDollars.toFixed(2)} to ${selectedName}`, 'success');
     } catch (err) {
       console.error('Failed to deposit funds:', err);
-      pushToast('Unable to deposit funds right now.', 'error');
     } finally {
       setDepositSubmitting(false);
     }
@@ -462,30 +441,31 @@ export default function WalletPage() {
 
             <div style={{ flex: 1 }} />
 
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div style={{ width: 240, minWidth: 180 }}>
+            <div className="fb-wallet-txn-tools">
+              <div className="fb-wallet-txn-search">
                 <Input
+                  className="fb-wallet-txn-search__input"
                   placeholder="Search transactions…"
                   value={txnSearch}
                   onChange={(e) => setTxnSearch(e.target.value)}
                   aria-label="Search transactions"
                 />
+                {(txnSearch || txnFilter !== 'all') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setTxnSearch('');
+                      setTxnFilter('all');
+                    }}
+                    className="fb-btn--field fb-wallet-txn-search__reset"
+                    aria-label="Reset filters"
+                    title="Reset filters"
+                  >
+                    Reset
+                  </Button>
+                )}
               </div>
-              {(txnSearch || txnFilter !== 'all') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setTxnSearch('');
-                    setTxnFilter('all');
-                  }}
-                  className="fb-btn--field"
-                  aria-label="Reset filters"
-                  title="Reset filters"
-                >
-                  Reset
-                </Button>
-              )}
             </div>
           </div>
 
@@ -495,15 +475,6 @@ export default function WalletPage() {
             <EmptyState
               title="No matching transactions"
               text="Try clearing filters or search."
-              actionText={txnSearch || txnFilter !== 'all' ? 'Reset' : undefined}
-              onAction={
-                txnSearch || txnFilter !== 'all'
-                  ? () => {
-                      setTxnSearch('');
-                      setTxnFilter('all');
-                    }
-                  : undefined
-              }
             />
           ) : (
             <>
@@ -615,8 +586,6 @@ export default function WalletPage() {
           </div>
         </div>
       </Modal>
-
-      <ToastContainer items={toasts} onClose={closeToast} />
     </>
   );
 

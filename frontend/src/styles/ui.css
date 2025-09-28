@@ -628,6 +628,24 @@ html, body { background: var(--fb-page-bg); }
   width: min(100%, 360px);
 }
 .fb-wallet-action__presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.fb-wallet-txn-tools {
+  display: flex;
+  align-items: center;
+  padding: 0 16px 0 12px;
+}
+.fb-wallet-txn-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fb-wallet-txn-search__input {
+  width: min(260px, 100%);
+  min-width: 180px;
+}
+.fb-wallet-txn-search__reset {
+  margin-left: 4px;
+  border-radius: 12px;
+}
 /* ===== Wallet: Header ===== */
 .fb-wallet-header {
   display: flex;
@@ -771,4 +789,3 @@ html, body { background: var(--fb-page-bg); }
     grid-template-columns: 1fr 1fr;
   }
 }
-
