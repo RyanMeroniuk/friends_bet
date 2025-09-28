@@ -1,219 +1,258 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Divider,
-} from '@mui/material';
-import { listMyGroups, GroupResponse } from '../api/group';
-import { getMyBalance, deposit } from '../api/wallet';
-import { useGroup } from '../context/GroupContext';
-import { useAuth } from '../context/AuthContext';
+import React from 'react';
+
+/* layout + shared UI */
+import TwoColumn from '../components/TwoColumn';
+import RightRail from '../components/RightRail';
+import SectionCard from '../components/SectionCard';
+import EmptyState from '../components/EmptyState';
+
+/* wallet UI bits (UI-only) */
+import WalletHeader from '../components/WalletHeader';
+import GroupScroller, { GroupChip } from '../components/GroupScroller';
+import StatCard from '../components/StatCard';
+import ActionPanel from '../components/ActionPanel';
+
+/* Step 5: skeleton loaders */
+import WalletStatsSkeleton from '../components/WalletStatsSkeleton';
+import ActionPanelSkeleton from '../components/ActionPanelSkeleton';
+import TxnListSkeleton from '../components/TxnListSkeleton';
+
+/* Step 6: micro-polish — toasts */
+import { ToastContainer, ToastItem } from '../components/Toast';
+
+type TxnItem = {
+  id: string;
+  ts: number;
+  label: string;
+  amount: number;
+};
 
 export default function WalletPage() {
-  const [groups, setGroups] = useState<GroupResponse[]>([]);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [depositAmt, setDepositAmt] = useState<string>('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingBal, setLoadingBal] = useState(false);
+  // --- Mock UI state (replace with real data later) ---
+  const [groups, setGroups] = React.useState<GroupChip[]>([
+    { id: 'g1', name: 'The Squad', sportTag: 'NBA', membersCount: 8, winRatePct: 68, active: true },
+    { id: 'g2', name: 'Sunday Funday', sportTag: 'NFL', membersCount: 6, winRatePct: 74 },
+    { id: 'g3', name: 'Office Heroes', sportTag: 'NBA', membersCount: 12, winRatePct: 61 },
+    { id: 'g4', name: 'March Madness Crew', sportTag: 'NCAA', membersCount: 14, winRatePct: 59 },
+    { id: 'g5', name: 'Hockey Night Squad', sportTag: 'NHL', membersCount: 7, winRatePct: 65 },
+  ]);
+  const [selectedId, setSelectedId] = React.useState('g1');
+  const selected = groups.find(g => g.id === selectedId)?.name ?? '—';
 
-  const { groupId, setGroupId } = useGroup();
-  const { user } = useAuth();
-  const currentUserId = user?.id ?? '';
+  // Step 5: UI-only loading flags
+  const [loadingSummary, setLoadingSummary] = React.useState<boolean>(false);
+  const [loadingTxns, setLoadingTxns] = React.useState<boolean>(false);
 
-  useEffect(() => {
-    if (!currentUserId) return;
-    (async () => {
-      try {
-        const mine = await listMyGroups(currentUserId);
-        setGroups(mine);
-        if (!groupId && mine.length > 0) setGroupId(mine[0].id);
-      } catch {
-        setError('Failed to load your groups');
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId]);
-
-  const selected = useMemo(
-    () => groups.find(g => g.id === groupId),
-    [groups, groupId]
-  );
-
-  useEffect(() => {
-    if (!selected || !currentUserId) {
-      setBalance(null);
-      return;
-    }
-    (async () => {
-      try {
-        setLoadingBal(true);
-        setError(null);
-        const bal = await getMyBalance(selected.id, currentUserId);
-        setBalance(bal);
-      } catch (e: any) {
-        setError(e?.response?.data || 'Could not load balance');
-        setBalance(null);
-      } finally {
-        setLoadingBal(false);
-      }
-    })();
-  }, [selected, currentUserId]);
-
-  function selectGroup(id: string) {
-    setGroupId(id);
-    setMessage(null);
-    setError(null);
-  }
-
-  async function handleDeposit() {
-    setMessage(null);
-    setError(null);
-
-    const amountCents = parseInt(depositAmt, 10);
-    if (isNaN(amountCents) || amountCents <= 0) {
-      setError('Please enter a valid positive amount (in cents).');
-      return;
-    }
-    if (!selected || !currentUserId) return;
-
-    try {
-      const wallet = await deposit(selected.id, currentUserId, amountCents);
-      setMessage(`Deposited $${(amountCents / 100).toFixed(2)}.`);
-      setDepositAmt('');
-      setBalance(wallet.balanceCents);
-    } catch (e: any) {
-      setError(e?.response?.data || 'Error making deposit');
-    }
-  }
-
-  const layout: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '280px 1fr',
-    gap: '1.25rem',
-    alignItems: 'start',
-  };
-  const card: React.CSSProperties = {
-    border: '1px solid #ddd',
-    borderRadius: 8,
-    padding: '1rem',
-    background: '#fff',
-  };
-  const listItem = (active: boolean): React.CSSProperties => ({
-    padding: '0.55rem 0.65rem',
-    borderRadius: 6,
-    cursor: 'pointer',
-    background: active ? '#eef5ff' : 'transparent',
-    border: active ? '1px solid #cfe3ff' : '1px solid transparent',
-    marginBottom: 6,
+  // Mocked wallet summary values (UI-only)
+  const [summary, setSummary] = React.useState({
+    current: 75,
+    available: 50,
+    pending: 25,
   });
 
-  return (
-    <Box sx={{ maxWidth: 1100, mx: 'auto', mt: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Wallet
-      </Typography>
+  // Mocked transactions (UI-only)
+  const [txns, setTxns] = React.useState<TxnItem[]>([
+    { id: 't1', ts: Date.now() - 1000 * 60 * 60, label: 'Deposit', amount: +50.0 },
+    { id: 't2', ts: Date.now() - 1000 * 60 * 60 * 4, label: 'Bet placed', amount: -20.0 },
+    { id: 't3', ts: Date.now() - 1000 * 60 * 60 * 28, label: 'Winnings', amount: +15.0 },
+  ]);
 
-      {message && (
-        <Typography sx={{ mb: 2 }} color="primary">
-          {message}
-        </Typography>
-      )}
-      {error && (
-        <Typography sx={{ mb: 2 }} color="error">
-          {error}
-        </Typography>
-      )}
+  // Step 6: Toasts (micro-polish)
+  const [toasts, setToasts] = React.useState<ToastItem[]>([]);
+  function pushToast(text: string, tone: ToastItem['tone'] = 'info') {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setToasts(prev => [...prev, { id, text, tone }]);
+    // auto-hide
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2400);
+  }
+  function closeToast(id: string) {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }
 
-      <div style={layout}>
-        <aside style={card}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Your Groups
-          </Typography>
-          <Divider sx={{ mb: 1 }} />
-          {groups.length === 0 && <div>No groups yet.</div>}
-          {groups.map(g => (
-            <div
-              key={g.id}
-              style={listItem(g.id === groupId)}
-              onClick={() => selectGroup(g.id)}
-              title={`Switch to ${g.name}`}
-            >
-              <div style={{ fontWeight: 600 }}>{g.name}</div>
-              <div style={{ fontSize: 12, color: '#666' }}>Code: {g.inviteCode}</div>
-            </div>
-          ))}
-        </aside>
+  // Simulate loading when group changes (UI-only)
+  React.useEffect(() => {
+    setLoadingSummary(true);
+    setLoadingTxns(true);
 
-        <main style={card}>
-          {!selected ? (
-            <div>Select a group on the left to view your wallet.</div>
-          ) : (
-            <>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Box>
-                  <Typography variant="h6" sx={{ m: 0 }}>
-                    {selected.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#666' }}>
-                    Invite Code: <code>{selected.inviteCode}</code>
-                  </Typography>
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={async () => {
-                    if (!selected || !currentUserId) return;
-                    try {
-                      setLoadingBal(true);
-                      const bal = await getMyBalance(selected.id, currentUserId);
-                      setBalance(bal);
-                    } catch (e: any) {
-                      setError(e?.response?.data || 'Could not refresh balance');
-                    } finally {
-                      setLoadingBal(false);
-                    }
-                  }}
-                >
-                  Refresh
-                </Button>
-              </Box>
+    const t1 = setTimeout(() => {
+      setSummary({ current: 75, available: 50, pending: 25 });
+      setLoadingSummary(false);
+    }, 700);
 
-              <Divider sx={{ mb: 2 }} />
+    const t2 = setTimeout(() => {
+      setTxns(prev => prev);
+      setLoadingTxns(false);
+    }, 900);
 
-              <Typography sx={{ mb: 2, fontSize: 18 }}>
-                Current Balance:{' '}
-                {loadingBal
-                  ? 'Loading…'
-                  : balance !== null
-                  ? `$${((balance || 0) / 100).toFixed(2)}`
-                  : '—'}
-              </Typography>
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [selectedId]);
 
-              <Typography variant="h6" sx={{ mt: 2 }}>
-                Deposit Funds
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
-                <TextField
-                  label="Amount (cents)"
-                  value={depositAmt}
-                  size="small"
-                  onChange={e => setDepositAmt(e.target.value)}
-                />
-                <Button variant="contained" onClick={handleDeposit} disabled={!currentUserId}>
-                  Deposit
-                </Button>
-              </Box>
+  function selectGroup(id: string) {
+    setGroups(prev => prev.map(x => ({ ...x, active: x.id === id })));
+    setSelectedId(id);
+    pushToast(`Switched to "${groups.find(g => g.id === id)?.name ?? 'group'}"`, 'info');
+  }
 
-              <Typography variant="body2" sx={{ mt: 2, color: '#666' }}>
-                Deposits are instant and reflected immediately in your wallet balance.
-              </Typography>
-            </>
-          )}
-        </main>
+  // Keyboard shortcuts: R to refresh, G to focus group strip (UI-only hint)
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (typing) return;
+
+      if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        handleRefresh();
+      } else if (e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        pushToast('Tip: Click a chip to switch groups.', 'info');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  function handleRefresh() {
+    // UI-only refresh: show skeletons briefly
+    setLoadingSummary(true);
+    setLoadingTxns(true);
+    setTimeout(() => setLoadingSummary(false), 600);
+    setTimeout(() => setLoadingTxns(false), 800);
+    pushToast('Wallet refreshed (UI-only)', 'success');
+  }
+
+  // Action handlers (UI-only): show toasts so the page feels responsive
+  function handleDeposit() {
+    pushToast('Deposit submitted (UI-only)', 'success');
+  }
+  function handleWithdraw() {
+    pushToast('Withdraw submitted (UI-only)', 'info');
+  }
+
+  const main = (
+    <>
+      <WalletHeader
+        onRefresh={handleRefresh}
+        rightSlot={
+          <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+            Selected: <b>{selected}</b>
+          </span>
+        }
+      />
+
+      {/* Select Group strip */}
+      <div style={{ marginBottom: 8 }}>
+        <SectionCard title="Select Group">
+          <GroupScroller groups={groups} onSelect={selectGroup} />
+        </SectionCard>
       </div>
-    </Box>
+
+      {/* Big stats row (with skeleton) */}
+      <div className="fb-wallet-stats-grid" style={{ marginBottom: 8 }}>
+        {loadingSummary ? (
+          <WalletStatsSkeleton />
+        ) : (
+          <>
+            <StatCard title="Current Balance" value={`$${summary.current.toFixed(2)}`} sub="Total in wallet" />
+            <StatCard title="Available Balance" value={`$${summary.available.toFixed(2)}`} sub="Ready to bet" tone="success" />
+            <StatCard title="Pending Bets" value={`$${summary.pending.toFixed(2)}`} sub="In active bets" tone="warning" />
+          </>
+        )}
+      </div>
+
+      {/* Actions (with skeleton) */}
+      <div className="fb-wallet-actions-grid">
+        {loadingSummary ? (
+          <ActionPanelSkeleton />
+        ) : (
+          <>
+            <ActionPanel
+              title="Add Funds"
+              helper={`Deposit money to ${selected}`}
+              presets={[25, 50, 100]}
+              ctaLabel="+ Deposit $0"
+              onSubmit={handleDeposit}
+            />
+            <ActionPanel
+              title="Withdraw Funds"
+              helper={`Transfer money out of ${selected}`}
+              balanceHint={`Available: $${summary.available.toFixed(2)}`}
+              ctaLabel="— Withdraw $0"
+              ctaTone="ghost"
+              onSubmit={handleWithdraw}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Transactions (with skeleton + empty state + simple inline list) */}
+      <div style={{ marginTop: 8 }}>
+        <SectionCard title="Transactions">
+          {loadingTxns ? (
+            <TxnListSkeleton rows={4} />
+          ) : txns.length === 0 ? (
+            <EmptyState
+              title="No recent transactions"
+              text="Your deposits, withdrawals, and bet movements will appear here."
+            />
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {txns.map((t) => {
+                const isCredit = t.amount >= 0;
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 12px',
+                      border: '1px solid var(--fb-border)',
+                      background: 'var(--fb-surface)',
+                      borderRadius: 10,
+                    }}
+                  >
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--fb-text)' }}>{t.label}</div>
+                      <div style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+                        {new Date(t.ts).toLocaleString()}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: isCredit ? '#065f46' : '#7f1d1d',
+                      }}
+                    >
+                      {isCredit ? '+' : '-'}${Math.abs(t.amount).toFixed(2)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* Toasts */}
+      <ToastContainer items={toasts} onClose={closeToast} />
+    </>
   );
+
+  const right = (
+    <RightRail>
+      <SectionCard title="Quick Tip">
+        <div style={{ color: 'var(--fb-text)' }}>
+          Create your group and share the invite code with friends to get started.
+        </div>
+      </SectionCard>
+    </RightRail>
+  );
+
+  return <TwoColumn main={main} right={right} />;
 }
