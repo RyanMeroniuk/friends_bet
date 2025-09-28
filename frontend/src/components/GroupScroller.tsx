@@ -7,6 +7,7 @@ export type GroupChip = {
   membersCount?: number;   // e.g., 8/12
   winRatePct?: number;     // e.g., 68
   active?: boolean;
+  balanceCents?: number;
 };
 
 type Props = {
@@ -28,16 +29,15 @@ export default function GroupScroller({ groups, onSelect }: Props) {
         >
           <div className="fb-wallet-chip__top">
             <span className="fb-wallet-chip__name">{g.name}</span>
-            {g.sportTag && <span className="fb-wallet-chip__tag">{g.sportTag}</span>}
           </div>
 
-          <div className="fb-wallet-chip__meta">
-            {typeof g.membersCount === 'number' && (
-              <span>👥 {g.membersCount}</span>
-            )}
-            {typeof g.winRatePct === 'number' && (
-              <span>↗ {g.winRatePct}%</span>
-            )}
+          <div className="fb-wallet-chip__balance" aria-label="Wallet balance">
+            <span className="fb-wallet-chip__balance-label">Balance</span>
+            <span className="fb-wallet-chip__balance-value">
+              {typeof g.balanceCents === 'number'
+                ? `$${(g.balanceCents / 100).toFixed(2)}`
+                : '—'}
+            </span>
           </div>
         </button>
       ))}

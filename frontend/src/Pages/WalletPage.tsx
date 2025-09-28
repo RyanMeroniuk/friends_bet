@@ -68,9 +68,10 @@ export default function WalletPage() {
     let cancelled = false;
 
     (async () => {
+      let mine: GroupResponse[] = [];
       try {
         setGroupsLoading(true);
-        const mine: GroupResponse[] = await listMyGroups(currentUserId);
+        mine = await listMyGroups(currentUserId);
 
         const mapped: GroupChip[] = mine.map((g) => ({
           id: g.id,
@@ -78,6 +79,7 @@ export default function WalletPage() {
           sportTag: undefined,
           membersCount: undefined,
           winRatePct: undefined,
+          balanceCents: undefined,
           active: false,
         }));
 
@@ -96,6 +98,41 @@ export default function WalletPage() {
         if (!cancelled) setGroups([]);
       } finally {
         if (!cancelled) setGroupsLoading(false);
+      }
+
+      if (cancelled || mine.length === 0) return;
+
+      try {
+        const balanceEntries = await Promise.all(
+          mine.map(async (g: GroupResponse) => {
+            try {
+              const cents = await getMyBalance(g.id, currentUserId);
+              return [g.id, cents] as const;
+            } catch (err) {
+              console.error('Failed to load balance for group', g.id, err);
+              return [g.id, null] as const;
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        const balanceMap = new Map<string, number>();
+        balanceEntries.forEach(([id, cents]) => {
+          if (typeof cents === 'number') balanceMap.set(id, cents);
+        });
+
+        if (!cancelled) {
+          setGroups((prev) =>
+            prev.map((chip) =>
+              balanceMap.has(chip.id)
+                ? { ...chip, balanceCents: balanceMap.get(chip.id)! }
+                : chip
+            )
+          );
+        }
+      } catch (err) {
+        console.error('Failed to load group balances:', err);
       }
     })();
 
@@ -192,6 +229,11 @@ export default function WalletPage() {
         available: balanceDollars,
         pending: 0,
       });
+      setGroups((prev) =>
+        prev.map((chip) =>
+          chip.id === selectedId ? { ...chip, balanceCents } : chip
+        )
+      );
       setLastRefreshed(Date.now());
       return true;
     } catch (err) {
@@ -236,6 +278,11 @@ export default function WalletPage() {
       const updatedBalance = resp.balanceCents / 100;
 
       setSummary((prev) => ({ current: updatedBalance, available: updatedBalance, pending: prev.pending }));
+      setGroups((prev) =>
+        prev.map((chip) =>
+          chip.id === selectedId ? { ...chip, balanceCents: resp.balanceCents } : chip
+        )
+      );
       setLastRefreshed(Date.now());
       setTxns((prev) => [
         {

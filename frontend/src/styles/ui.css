@@ -609,13 +609,24 @@ html, body { background: var(--fb-page-bg); }
   border: 1px solid var(--fb-border);
   background: var(--fb-surface);
   border-radius: var(--fb-radius);
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: grid;
-  gap: 10px;
+  gap: 20px;
 }
 .fb-wallet-action__title { font-weight: 700; }
 .fb-wallet-action__helper { color: var(--fb-muted); font-size: 13px; }
 .fb-wallet-action__hint { color: var(--fb-muted); font-size: 12px; margin-top: 4px; }
+.fb-wallet-action__head { display: grid; gap: 6px; }
+.fb-wallet-action__body { display: grid; gap: 16px; }
+.fb-wallet-action__field {
+  width: min(100%, 360px);
+}
+.fb-wallet-action__field .fb-input {
+  width: 100%;
+}
+.fb-wallet-action__cta {
+  width: min(100%, 360px);
+}
 .fb-wallet-action__presets { display: flex; flex-wrap: wrap; gap: 8px; }
 /* ===== Wallet: Header ===== */
 .fb-wallet-header {
@@ -693,11 +704,18 @@ html, body { background: var(--fb-page-bg); }
   color: var(--fb-text);
 }
 
-.fb-wallet-chip__meta {
+.fb-wallet-chip__balance {
   display: inline-flex;
-  gap: 12px;
+  gap: 6px;
+  font-size: 13px;
   color: var(--fb-muted);
-  font-size: 12px;
+}
+.fb-wallet-chip__balance-label {
+  font-weight: 500;
+}
+.fb-wallet-chip__balance-value {
+  font-weight: 700;
+  color: var(--fb-text);
 }
 /* ===== Wallet: Funds forms ===== */
 .fb-funds { display: grid; gap: 10px; }

@@ -33,12 +33,14 @@ export default function ActionPanel({
       </div>
 
       <div className="fb-wallet-action__body">
-        <Input
-          placeholder="Enter amount"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          aria-label={`${title} amount`}
-        />
+        <div className="fb-wallet-action__field">
+          <Input
+            placeholder="Enter amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            aria-label={`${title} amount`}
+          />
+        </div>
         {balanceHint && <div className="fb-wallet-action__hint">{balanceHint}</div>}
 
         <div className="fb-wallet-action__presets">
@@ -54,16 +56,18 @@ export default function ActionPanel({
           ))}
         </div>
 
-        <Button
-          type="button"
-          size="md"
-          className="fb-btn--field"
-          variant={ctaTone === 'ghost' ? 'ghost' : undefined}
-          onClick={() => onSubmit?.(parsed)}
-          disabled={parsed <= 0}
-        >
-          {ctaLabel.replace('$0', `$${(parsed / 100).toFixed(2)}`)}
-        </Button>
+        <div className="fb-wallet-action__cta">
+          <Button
+            type="button"
+            size="md"
+            className="fb-btn--field"
+            variant={ctaTone === 'ghost' ? 'ghost' : undefined}
+            onClick={() => onSubmit?.(parsed)}
+            disabled={parsed <= 0}
+          >
+            {ctaLabel.replace('$0', `$${(parsed / 100).toFixed(2)}`)}
+          </Button>
+        </div>
       </div>
     </div>
   );
