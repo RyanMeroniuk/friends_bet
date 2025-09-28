@@ -603,7 +603,7 @@ html, body { background: var(--fb-page-bg); }
   gap: 8px;
 }
 @media (min-width: 1000px) {
-  .fb-wallet-actions-grid { grid-template-columns: 1fr 1fr; }
+  .fb-wallet-actions-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 }
 .fb-wallet-action {
   border: 1px solid var(--fb-border);

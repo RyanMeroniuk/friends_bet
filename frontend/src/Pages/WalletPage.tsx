@@ -143,12 +143,10 @@ export default function WalletPage() {
 
   // Confirmation modals + editable amounts with validation
   const [depositOpen, setDepositOpen] = React.useState(false);
-  const [withdrawOpen, setWithdrawOpen] = React.useState(false);
   const [amount, setAmount] = React.useState<string>('25'); // editable field
   const [depositSubmitting, setDepositSubmitting] = React.useState(false);
   const parsedAmount = Number(amount) || 0;
   const parsedAmountCents = Math.round(parsedAmount * 100);
-  const withdrawInvalid = parsedAmount <= 0 || parsedAmount > summary.available;
   const depositInvalid = parsedAmount <= 0 || parsedAmountCents <= 0 || !selectedId || !currentUserId;
   const depositDisabledReason = !selectedId
     ? 'Select a group before depositing'
@@ -223,11 +221,6 @@ export default function WalletPage() {
     setAmount((amountCents / 100).toString());
     setDepositOpen(true);
   }
-  function handleWithdraw() {
-    setAmount('20');
-    setWithdrawOpen(true);
-  }
-
   async function confirmDeposit() {
     if (depositInvalid || depositSubmitting || !selectedId || !currentUserId) return;
 
@@ -263,12 +256,6 @@ export default function WalletPage() {
     } finally {
       setDepositSubmitting(false);
     }
-  }
-  function confirmWithdraw() {
-    if (withdrawInvalid) return;
-    setWithdrawOpen(false);
-    pushToast(`Withdrew $${parsedAmount.toFixed(2)} from ${selectedName}`, 'info');
-    // Future: call withdraw API then refresh
   }
 
   // Keyboard shortcuts
@@ -370,14 +357,6 @@ export default function WalletPage() {
               presets={[25, 50, 100]}
               ctaLabel="+ Deposit $0"
               onSubmit={handleDeposit}
-            />
-            <ActionPanel
-              title="Withdraw Funds"
-              helper={`Transfer money out of ${selectedName}`}
-              balanceHint={`Available: $${summary.available.toFixed(2)}`}
-              ctaLabel="— Withdraw $0"
-              ctaTone="ghost"
-              onSubmit={handleWithdraw}
             />
           </>
         )}
@@ -584,70 +563,6 @@ export default function WalletPage() {
               <span className="fb-kv__label">New current balance</span>
               <span className="fb-kv__value">
                 ${(summary.current + Math.max(0, parsedAmount)).toFixed(2)} (preview)
-              </span>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Withdraw Modal (editable amount + inline validation) */}
-      <Modal
-        open={withdrawOpen}
-        title="Confirm Withdrawal"
-        onClose={() => setWithdrawOpen(false)}
-        footer={
-          <>
-            <button
-              className="fb-btn fb-btn--ghost fb-btn--md"
-              onClick={() => setWithdrawOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="fb-btn fb-btn--primary fb-btn--md"
-              onClick={confirmWithdraw}
-              disabled={withdrawInvalid}
-              title={
-                withdrawInvalid
-                  ? parsedAmount <= 0
-                    ? 'Enter an amount greater than $0'
-                    : 'Amount exceeds available balance'
-                  : undefined
-              }
-            >
-              Confirm
-            </button>
-          </>
-        }
-      >
-        <div className="fb-ff">
-          <div className="fb-ff__helper">
-            You’re about to withdraw from <b>{selectedName}</b>.
-          </div>
-
-          <label className="fb-ff__label" htmlFor="withdraw-amt">Amount</label>
-          <Input
-            id="withdraw-amt"
-            type="number"
-            min={0}
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            aria-invalid={withdrawInvalid}
-          />
-          {withdrawInvalid && (
-            <div className="fb-ff__error">
-              {parsedAmount <= 0
-                ? 'Please enter an amount greater than $0.00.'
-                : 'Amount exceeds available balance.'}
-            </div>
-          )}
-
-          <div className="fb-kv" style={{ marginTop: 8 }}>
-            <div className="fb-kv__row">
-              <span className="fb-kv__label">Available after</span>
-              <span className="fb-kv__value">
-                ${(Math.max(0, summary.available - Math.max(0, parsedAmount))).toFixed(2)} (preview)
               </span>
             </div>
           </div>
