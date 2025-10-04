@@ -3,23 +3,28 @@ import { listMyGroups, GroupResponse } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import { listGames, GameSummary } from '../api/game';
 import {
-  Box,
   Typography,
   TextField,
-  Button,
-  List,
-  ListItem,
-  Divider,
+  Button as MUIButton,
   MenuItem,
   Select,
   InputLabel,
   FormControl,
-  Paper,
 } from '@mui/material';
 
-// NEW: use your helpers you said you added to bet.ts (adjust the path if you placed them elsewhere)
 import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi } from '../api/bet';
 import { useAuth } from '../context/AuthContext';
+
+/* Shared layout + cards to match Wallet */
+import TwoColumn from '../components/TwoColumn';
+import SectionCard from '../components/SectionCard';
+import RightRail from '../components/RightRail';
+
+/* Group selector strip (same as Wallet) */
+import GroupScroller, { GroupChip } from '../components/GroupScroller';
+
+/* Header you named */
+import BetHeader from '../components/BetHeader';
 
 type MarketType =
   | 'WINNER'
@@ -32,8 +37,9 @@ type MarketType =
 
 const DAYS_WINDOW = 2; // next 2 days per backend endpoints
 const API_BASE = (process.env.REACT_APP_API_BASE || '').replace(/\/$/, '');
+
 export default function BetPage() {
-  // groups + selection (left panel unchanged)
+  // groups + selection
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
 
@@ -74,7 +80,7 @@ export default function BetPage() {
   const [sgpLegs, setSgpLegs] = useState<string>('');
   const [parlayLegs, setParlayLegs] = useState<string>('');
 
-  // sports + games (NEW)
+  // sports + games
   const [sports, setSports] = useState<string[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>('');
   const [sportsError, setSportsError] = useState<string | null>(null);
@@ -86,20 +92,11 @@ export default function BetPage() {
     [games, gameId]
   );
 
-  // ---- NEW: admin action buttons loading flags
+  // admin action loading flags
   const [busyRefresh, setBusyRefresh] = useState(false);
   const [busySettle, setBusySettle] = useState(false);
 
-  const listItem = (active: boolean): React.CSSProperties => ({
-    padding: '0.55rem 0.65rem',
-    borderRadius: 6,
-    cursor: 'pointer',
-    background: active ? '#eef5ff' : 'transparent',
-    border: active ? '1px solid #cfe3ff' : '1px solid transparent',
-    marginBottom: 6,
-  });
-
-  // ------- load groups (unchanged) -------
+  // ------- load groups -------
   useEffect(() => {
     if (!userId) return;
     listMyGroups(userId)
@@ -110,22 +107,20 @@ export default function BetPage() {
       .catch(() => setError('Could not load your groups'));
   }, [userId]);
 
-  // ------- load bets when group changes (unchanged) -------
+  // ------- load bets when group changes -------
   useEffect(() => {
     if (!selectedGroup) return;
     loadBets();
   }, [selectedGroup]);
 
-  // ------- NEW: load sports (next 2 days) -------
+  // ------- load sports (next 2 days) -------
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setSportsError(null);
       try {
         const res = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
-          headers: {
-            Accept: 'application/json',
-          },
+          headers: { Accept: 'application/json' },
         });
         if (!res.ok) throw new Error(await res.text());
         const list: string[] = await res.json();
@@ -140,7 +135,7 @@ export default function BetPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // ------- NEW: load games whenever sport changes -------
+  // ------- load games whenever sport changes -------
   useEffect(() => {
     if (!selectedSport) return;
     let cancelled = false;
@@ -148,11 +143,7 @@ export default function BetPage() {
       try {
         const res = await fetch(
           `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
-          {
-            headers: {
-              Accept: 'application/json',
-            },
-          }
+          { headers: { Accept: 'application/json' } }
         );
         if (!res.ok) throw new Error(await res.text());
         const list: any[] = await res.json();
@@ -171,15 +162,14 @@ export default function BetPage() {
           }
         }
       } catch {
-        // keep silent; manual Game ID still works
+        // ignore; manual Game ID still works
       }
     })();
     return () => { cancelled = true; };
   }, [selectedSport]);
 
-  // ------- existing: initial listGames fallback (kept) -------
+  // ------- existing: initial listGames fallback -------
   useEffect(() => {
-    // If sport picker hasn’t selected anything yet, keep your legacy loader
     if (selectedSport) return;
     (async () => {
       try {
@@ -217,42 +207,30 @@ export default function BetPage() {
     setParlayLegs('');
   }
 
-  // ---------- Prefill from selected game/odds ----------
   function round2(n: number) {
     return Math.round(n * 100) / 100;
   }
 
   function prefillFromGame(game: GameSummary | undefined, market: MarketType) {
     if (!game) return;
-
     const o = (game as any).odds || {};
     switch (market) {
       case 'WINNER': {
         setPick('HOME');
         const homeOdds = o.h2h?.home;
-        if (typeof homeOdds === 'number' && homeOdds > 1) {
-          setOdds(round2(homeOdds));
-        }
+        if (typeof homeOdds === 'number' && homeOdds > 1) setOdds(round2(homeOdds));
         break;
       }
       case 'SPREAD': {
         setPick('HOME');
-        if (typeof o.spreads?.lineHome === 'number') {
-          setSpreadPoints(String(o.spreads.lineHome));
-        }
-        if (typeof o.spreads?.oddsHome === 'number' && o.spreads.oddsHome > 1) {
-          setOdds(round2(o.spreads.oddsHome));
-        }
+        if (typeof o.spreads?.lineHome === 'number') setSpreadPoints(String(o.spreads.lineHome));
+        if (typeof o.spreads?.oddsHome === 'number' && o.spreads.oddsHome > 1) setOdds(round2(o.spreads.oddsHome));
         break;
       }
       case 'TOTALS': {
         setTotalsDirection('OVER');
-        if (typeof o.totals?.line === 'number') {
-          setTotalsLine(String(o.totals.line));
-        }
-        if (typeof o.totals?.over === 'number' && o.totals.over > 1) {
-          setOdds(round2(o.totals.over));
-        }
+        if (typeof o.totals?.line === 'number') setTotalsLine(String(o.totals.line));
+        if (typeof o.totals?.over === 'number' && o.totals.over > 1) setOdds(round2(o.totals.over));
         break;
       }
       default:
@@ -260,14 +238,12 @@ export default function BetPage() {
     }
   }
 
-  // when you change game, prefill fields for current market
   function handlePickGame(newGameId: string) {
     setGameId(newGameId);
     const g = games.find(x => x.id === newGameId);
     prefillFromGame(g, marketType);
   }
 
-  // when you change market, re-apply prefill if a game is selected
   function handleMarketChange(next: MarketType) {
     setMarketType(next);
     setMessage(null);
@@ -389,40 +365,27 @@ export default function BetPage() {
     }
   }
 
-  // ---- CHANGED: Admin actions (two buttons) ----
-
   async function refreshOddsAndGames() {
     try {
       setBusyRefresh(true);
       setMessage(null);
       setError(null);
 
-      // 1) Ask backend to refresh odds data
       await refreshSports(selectedSport || undefined);
 
-      // 2) Re-pull sports list
       const resSports = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
-        headers: {
-          Accept: 'application/json',
-        },
+        headers: { Accept: 'application/json' },
       });
       if (resSports.ok) {
         const list: string[] = await resSports.json();
         setSports(list || []);
-        if (!selectedSport && list?.length) {
-          setSelectedSport(list[0]);
-        }
+        if (!selectedSport && list?.length) setSelectedSport(list[0]);
       }
 
-      // 3) Re-pull games for current sport (if any)
       if (selectedSport) {
         const resGames = await fetch(
           `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
-          {
-            headers: {
-              Accept: 'application/json',
-            },
-          }
+          { headers: { Accept: 'application/json' } }
         );
         if (resGames.ok) {
           const list: any[] = await resGames.json();
@@ -456,9 +419,7 @@ export default function BetPage() {
       setError(null);
       if (!selectedGroup) throw new Error('Select a group first');
 
-      // Use your helper to settle accepted bets in this group
       const res = await settleAcceptedBetsApi(selectedGroup);
-      // Refresh list to reflect any status changes
       await loadBets();
       setMessage(`Settlement check complete${typeof res?.settled === 'number' ? ` — ${res.settled} settled.` : '.'}`);
     } catch (e: any) {
@@ -468,7 +429,6 @@ export default function BetPage() {
     }
   }
 
-  // Reusable picker block (sport + game dropdowns)
   function SportGamePickers() {
     return (
       <>
@@ -502,436 +462,459 @@ export default function BetPage() {
                 {g.homeTeam} vs {g.awayTeam} — {new Date(g.startTime).toLocaleString()}
               </MenuItem>
             ))}
-            {/* Leave empty list as-is; user can still type Game ID manually below */}
           </Select>
         </FormControl>
       </>
     );
   }
 
-  function renderProposeFields() {
-    const commonEnd = (
-      <>
-        <TextField
-          label="Odds (decimal)"
-          type="number"
-          value={odds}
-          onChange={e => setOdds(+e.target.value)}
-          inputProps={{ step: '0.01', min: 1.01 }}
-          required
-        />
-        <TextField
-          label="Amount (cents)"
-          type="text"
-          inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-          value={amountCents}
-          onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))}
-          placeholder="e.g. 500"
-          required
-        />
-      </>
-    );
-
-    switch (marketType) {
-      case 'WINNER':
-        return (
-          <>
-            <SportGamePickers />
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <FormControl>
-              <InputLabel id="pick-label">Pick</InputLabel>
-              <Select
-                labelId="pick-label"
-                label="Pick"
-                value={pick}
-                onChange={e => setPick(String(e.target.value))}
-              >
-                <MenuItem value="HOME">HOME</MenuItem>
-                <MenuItem value="AWAY">AWAY</MenuItem>
-              </Select>
-            </FormControl>
-            {commonEnd}
-          </>
-        );
-      case 'SPREAD':
-        return (
-          <>
-            <SportGamePickers />
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <FormControl>
-              <InputLabel id="spread-team">Team</InputLabel>
-              <Select
-                labelId="spread-team"
-                label="Team"
-                value={pick}
-                onChange={e => setPick(String(e.target.value))}
-              >
-                <MenuItem value="HOME">HOME</MenuItem>
-                <MenuItem value="AWAY">AWAY</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="Spread Points (e.g., -3.5)"
-              value={spreadPoints}
-              onChange={e => setSpreadPoints(e.target.value)}
-              placeholder="-3.5"
-              inputProps={{ inputMode: 'decimal' }}
-              required
-            />
-            {commonEnd}
-          </>
-        );
-      case 'TOTALS':
-        return (
-          <>
-            <SportGamePickers />
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <TextField
-              label="Totals Line (e.g., 210.5)"
-              value={totalsLine}
-              onChange={e => setTotalsLine(e.target.value)}
-              inputProps={{ inputMode: 'decimal' }}
-              required
-            />
-            <FormControl>
-              <InputLabel id="totals-dir">Direction</InputLabel>
-              <Select
-                labelId="totals-dir"
-                label="Direction"
-                value={totalsDirection}
-                onChange={e => setTotalsDirection(e.target.value as 'OVER' | 'UNDER')}
-              >
-                <MenuItem value="OVER">OVER</MenuItem>
-                <MenuItem value="UNDER">UNDER</MenuItem>
-              </Select>
-            </FormControl>
-            {commonEnd}
-          </>
-        );
-      case 'PLAYER_PROP':
-        return (
-          <>
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <TextField
-              label="Player Name"
-              value={ppPlayerName}
-              onChange={e => setPpPlayerName(e.target.value)}
-              required
-            />
-            <FormControl>
-              <InputLabel id="pp-stat">Stat</InputLabel>
-              <Select
-                labelId="pp-stat"
-                label="Stat"
-                value={ppStatType}
-                onChange={e => setPpStatType(e.target.value as any)}
-              >
-                <MenuItem value="POINTS">POINTS</MenuItem>
-                <MenuItem value="REBOUNDS">REBOUNDS</MenuItem>
-                <MenuItem value="ASSISTS">ASSISTS</MenuItem>
-                <MenuItem value="GOALS">GOALS</MenuItem>
-                <MenuItem value="SAVES">SAVES</MenuItem>
-                <MenuItem value="CUSTOM">CUSTOM</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="Line (e.g., 22.5)"
-              value={ppLine}
-              onChange={e => setPpLine(e.target.value)}
-              inputProps={{ inputMode: 'decimal' }}
-              required
-            />
-            <FormControl>
-              <InputLabel id="pp-dir">Direction</InputLabel>
-              <Select
-                labelId="pp-dir"
-                label="Direction"
-                value={ppDirection}
-                onChange={e => setPpDirection(e.target.value as any)}
-              >
-                <MenuItem value="OVER">OVER</MenuItem>
-                <MenuItem value="UNDER">UNDER</MenuItem>
-              </Select>
-            </FormControl>
-            {commonEnd}
-          </>
-        );
-      case 'TEAM_PROP':
-        return (
-          <>
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <FormControl>
-              <InputLabel id="tp-team">Team</InputLabel>
-              <Select
-                labelId="tp-team"
-                label="Team"
-                value={tpTeam}
-                onChange={e => setTpTeam(e.target.value as any)}
-              >
-                <MenuItem value="HOME">HOME</MenuItem>
-                <MenuItem value="AWAY">AWAY</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="Prop Type (e.g., TOTAL_POINTS)"
-              value={tpPropType}
-              onChange={e => setTpPropType(e.target.value)}
-              required
-            />
-            <TextField
-              label="Line (e.g., 100.5)"
-              value={tpLine}
-              onChange={e => setTpLine(e.target.value)}
-              inputProps={{ inputMode: 'decimal' }}
-              required
-            />
-            <FormControl>
-              <InputLabel id="tp-dir">Direction</InputLabel>
-              <Select
-                labelId="tp-dir"
-                label="Direction"
-                value={tpDirection}
-                onChange={e => setTpDirection(e.target.value as any)}
-              >
-                <MenuItem value="OVER">OVER</MenuItem>
-                <MenuItem value="UNDER">UNDER</MenuItem>
-              </Select>
-            </FormControl>
-            {commonEnd}
-          </>
-        );
-      case 'SAME_GAME':
-        return (
-          <>
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <TextField
-              label="Legs (one per line)"
-              value={sgpLegs}
-              onChange={e => setSgpLegs(e.target.value)}
-              multiline
-              minRows={3}
-              placeholder={`Example:\nHOME -3.5\nPLAYER X OVER 22.5 PTS`}
-              required
-            />
-            {commonEnd}
-          </>
-        );
-      case 'PARLAY':
-        return (
-          <>
-            <TextField
-              label="Game ID"
-              value={gameId}
-              onChange={e => setGameId(e.target.value)}
-              required
-            />
-            <TextField
-              label="Legs (one per line)"
-              value={parlayLegs}
-              onChange={e => setParlayLegs(e.target.value)}
-              multiline
-              minRows={3}
-              placeholder={`Example:\nGAME_A HOME ML\nGAME_B OVER 210.5`}
-              required
-            />
-            {commonEnd}
-          </>
-        );
-      default:
-        return null;
-    }
-  }
-
-  function renderBetRow(b: Bet) {
-    const isOpen = b.status === 'OPEN';
+  // ---- UI helpers for card rendering ----
+  function formatPick(b: Bet): string {
     const sp = (b as any).details?.spreadPoints;
     const total = (b as any).details?.totalLine;
-
-    let pickLabel = b.pick;
     if (b.marketType === 'SPREAD' && typeof sp === 'number') {
-      pickLabel = `${b.pick} ${sp > 0 ? `+${sp}` : sp}`;
-    } else if (b.marketType === 'TOTALS' && typeof total === 'number') {
-      pickLabel = `${b.pick} ${total}`; // OVER 210.5 / UNDER 210.5
+      return `${b.pick} ${sp > 0 ? `+${sp}` : sp}`;
     }
-
-    return (
-      <ListItem key={b.id} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-        <Typography>
-          <strong>{b.marketType}</strong> — {pickLabel} @ {b.odds} — $
-          {(b.amountCents / 100).toFixed(2)} — Status: {b.status}
-        </Typography>
-        {isOpen && (
-          <Button size="small" onClick={() => onAccept(b.id)} sx={{ mt: 1 }}>
-            Accept
-          </Button>
-        )}
-      </ListItem>
-    );
+    if (b.marketType === 'TOTALS' && typeof total === 'number') {
+      return `${b.pick} ${total}`;
+    }
+    return b.pick;
+  }
+  function statusTone(status: Bet['status']) {
+    switch (status) {
+      case 'OPEN': return { bg: 'var(--fb-accent-1)', text: 'var(--fb-text)' };
+      case 'ACCEPTED': return { bg: '#EAF7FF', text: '#1e3a8a' };
+      case 'RESOLVED': return { bg: '#ecfdf5', text: '#065f46' };
+      case 'VOID': return { bg: '#fef2f2', text: '#7f1d1d' };
+      default: return { bg: '#f1f5f9', text: '#334155' };
+    }
   }
 
-  return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 2, mt: 4 }}>
-      {/* LEFT: Your Groups (unchanged) */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Your Groups
-        </Typography>
-        <Divider sx={{ mb: 1 }} />
-        {groups.length === 0 && <div>No groups yet.</div>}
-        {groups.map(g => (
-          <div
-            key={g.id}
-            style={listItem(g.id === selectedGroup)}
-            onClick={() => setSelectedGroup(g.id)}
-            title={`Switch to ${g.name}`}
-          >
-            <div style={{ fontWeight: 600 }}>{g.name}</div>
-            <div style={{ fontSize: 12, color: '#666' }}>Code: {g.inviteCode}</div>
-          </div>
-        ))}
-      </Paper>
+  const selectedGroupName =
+    groups.find(g => g.id === selectedGroup)?.name ?? '—';
 
-      {/* RIGHT: stacked panels */}
-      <Box sx={{ display: 'grid', gap: 2 }}>
-        {/* Admin toolbar (CHANGED handlers only) */}
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          <Button
-            variant="outlined"
-            onClick={refreshOddsAndGames}
-            disabled={busyRefresh}
-          >
-            {busyRefresh ? 'Refreshing…' : 'Refresh Sports & Games'}
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={settleAcceptedBets}
-            disabled={busySettle}
-          >
-            {busySettle ? 'Settling…' : 'Settle Accepted Bets'}
-          </Button>
-        </Box>
+  // Adapt API groups to GroupScroller chips (minimal fields; UI-only)
+  const groupChips: GroupChip[] = groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    active: g.id === selectedGroup,
+    membersCount: 0,
+    winRatePct: 0,
+  })) as GroupChip[];
 
-        {/* Top: Unsettled bets */}
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Open & Accepted Bets
-          </Typography>
+  const main = (
+    <>
+      <BetHeader
+        onRefreshSports={refreshOddsAndGames}
+        onSettleAccepted={settleAcceptedBets}
+        busyRefresh={busyRefresh}
+        busySettle={busySettle}
+        rightSlot={
+          <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+            Selected: <b>{selectedGroupName}</b>
+          </span>
+        }
+      />
+
+      {/* Select Group strip */}
+      <div style={{ marginBottom: 8 }}>
+        <SectionCard title="Select Group">
+          <GroupScroller
+            groups={groupChips}
+            onSelect={(id) => setSelectedGroup(id)}
+          />
+        </SectionCard>
+      </div>
+
+      {/* Bets list — redesigned as card grid */}
+      <div style={{ marginBottom: 8 }}>
+        <SectionCard title="Open & Accepted Bets">
           {!selectedGroup ? (
             <Typography>Select a group to view bets.</Typography>
           ) : (
-            <List>
-              {bets
-                .filter(b => b.status !== 'RESOLVED' && b.status !== 'VOID')
-                .map(renderBetRow)}
-            </List>
-          )}
-        </Paper>
-
-        {/* Bottom: Propose bet (dynamic fields) */}
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Propose a Bet
-          </Typography>
-
-          {sportsError && (
-            <Typography color="error" sx={{ mb: 1 }}>
-              {sportsError}
-            </Typography>
-          )}
-          {error && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {error}
-            </Typography>
-          )}
-          {message && (
-            <Typography color="secondary" sx={{ mb: 2 }}>
-              {message}
-            </Typography>
-          )}
-
-          {!selectedGroup ? (
-            <Typography>Select a group first.</Typography>
-          ) : (
-            <Box
-              component="form"
-              onSubmit={e => {
-                e.preventDefault();
-                onPropose();
-              }}
-              sx={{
+            <div
+              style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                gap: 2,
-                alignItems: 'start',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: 12,
               }}
             >
-              <TextField
-                label="Your User ID"
-                value={userId}
-                InputProps={{ readOnly: true }}
-                helperText={userId ? undefined : 'Sign in again if this is empty'}
-                required
-              />
+              {bets
+                .filter(b => b.status !== 'RESOLVED' && b.status !== 'VOID')
+                .map((b) => {
+                  const tone = statusTone(b.status);
+                  return (
+                    <div
+                      key={b.id}
+                      className="fb-fade"
+                      style={{
+                        border: '1px solid var(--fb-border)',
+                        background: 'var(--fb-surface)',
+                        borderRadius: 16,
+                        padding: 16,
+                        display: 'grid',
+                        gap: 12,
+                      }}
+                    >
+                      {/* Header row */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--fb-text)', fontSize: 18 }}>
+                          {b.gameId}
+                        </div>
+                        <span
+                          className="fb-badge"
+                          style={{
+                            background: tone.bg,
+                            color: tone.text,
+                            borderColor: 'var(--fb-border)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {b.status}
+                        </span>
+                      </div>
 
-              <FormControl>
-                <InputLabel id="market-label">Market</InputLabel>
-                <Select
-                  labelId="market-label"
-                  label="Market"
-                  value={marketType}
-                  onChange={e => handleMarketChange(e.target.value as MarketType)}
-                >
-                  <MenuItem value="WINNER">Moneyline (WINNER)</MenuItem>
-                  <MenuItem value="SPREAD">Spread</MenuItem>
-                  <MenuItem value="TOTALS">Totals (O/U)</MenuItem>
-                  <MenuItem value="PLAYER_PROP">Player Prop</MenuItem>
-                  <MenuItem value="TEAM_PROP">Team Prop</MenuItem>
-                  <MenuItem value="SAME_GAME">Same Game (SGP)</MenuItem>
-                  <MenuItem value="PARLAY">Parlay</MenuItem>
-                </Select>
-              </FormControl>
+                      {/* Key-Value rows */}
+                      <div className="fb-kv">
+                        <div className="fb-kv__row">
+                          <span className="fb-kv__label">Market:</span>
+                          <span className="fb-kv__value">{b.marketType}</span>
+                        </div>
+                        <div className="fb-kv__row">
+                          <span className="fb-kv__label">Pick:</span>
+                          <span className="fb-kv__value">{formatPick(b)}</span>
+                        </div>
+                        <div className="fb-kv__row">
+                          <span className="fb-kv__label">Amount:</span>
+                          <span className="fb-kv__value">${(b.amountCents / 100).toFixed(2)}</span>
+                        </div>
+                        <div className="fb-kv__row">
+                          <span className="fb-kv__label">Odds:</span>
+                          <span className="fb-kv__value">{b.odds}</span>
+                        </div>
+                      </div>
 
-              {renderProposeFields()}
-
-              <Box sx={{ gridColumn: '1 / -1' }}>
-                <Button type="submit" variant="contained">
-                  Propose Bet
-                </Button>
-              </Box>
-            </Box>
+                      {/* Footer row: time + action */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 8,
+                          alignItems: 'center',
+                          borderTop: '1px solid var(--fb-border)',
+                          paddingTop: 12,
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+                          {/* We don’t have a kickoff on the bet object—show created time as a proxy if present */}
+                          {('createdAt' in b && (b as any).createdAt)
+                            ? new Date((b as any).createdAt).toLocaleString()
+                            : 'Active'}
+                        </div>
+                        <div style={{ marginLeft: 'auto' }}>
+                          {b.status === 'OPEN' && (
+                            <button
+                              className="fb-btn fb-btn--primary fb-btn--md"
+                              onClick={() => onAccept(b.id)}
+                            >
+                              Accept
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           )}
-        </Paper>
-      </Box>
-    </Box>
+        </SectionCard>
+      </div>
+
+      {/* Propose bet (unchanged logic; lightly cleaned grid) */}
+      <SectionCard title="Propose a Bet">
+        {sportsError && (
+          <Typography color="error" sx={{ mb: 1 }}>
+            {sportsError}
+          </Typography>
+        )}
+        {error && (
+          <Typography color="error" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+        )}
+        {message && (
+          <Typography color="secondary" sx={{ mb: 2 }}>
+            {message}
+          </Typography>
+        )}
+
+        {!selectedGroup ? (
+          <Typography>Select a group first.</Typography>
+        ) : (
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              onPropose();
+            }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 12,
+              alignItems: 'start',
+            }}
+          >
+            <TextField
+              label="Your User ID"
+              value={userId}
+              InputProps={{ readOnly: true }}
+              helperText={userId ? undefined : 'Sign in again if this is empty'}
+              required
+            />
+
+            <FormControl>
+              <InputLabel id="market-label">Market</InputLabel>
+              <Select
+                labelId="market-label"
+                label="Market"
+                value={marketType}
+                onChange={e => handleMarketChange(e.target.value as MarketType)}
+              >
+                <MenuItem value="WINNER">Moneyline (WINNER)</MenuItem>
+                <MenuItem value="SPREAD">Spread</MenuItem>
+                <MenuItem value="TOTALS">Totals (O/U)</MenuItem>
+                <MenuItem value="PLAYER_PROP">Player Prop</MenuItem>
+                <MenuItem value="TEAM_PROP">Team Prop</MenuItem>
+                <MenuItem value="SAME_GAME">Same Game (SGP)</MenuItem>
+                <MenuItem value="PARLAY">Parlay</MenuItem>
+              </Select>
+            </FormControl>
+
+            {/* Market-specific inputs */}
+            {(() => {
+              const commonEnd = (
+                <>
+                  <TextField
+                    label="Odds (decimal)"
+                    type="number"
+                    value={odds}
+                    onChange={e => setOdds(+e.target.value)}
+                    inputProps={{ step: '0.01', min: 1.01 }}
+                    required
+                  />
+                  <TextField
+                    label="Amount (cents)"
+                    type="text"
+                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                    value={amountCents}
+                    onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 500"
+                    required
+                  />
+                </>
+              );
+
+              switch (marketType) {
+                case 'WINNER':
+                  return (
+                    <>
+                      <SportGamePickers />
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <FormControl>
+                        <InputLabel id="pick-label">Pick</InputLabel>
+                        <Select
+                          labelId="pick-label"
+                          label="Pick"
+                          value={pick}
+                          onChange={e => setPick(String(e.target.value))}
+                        >
+                          <MenuItem value="HOME">HOME</MenuItem>
+                          <MenuItem value="AWAY">AWAY</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {commonEnd}
+                    </>
+                  );
+                case 'SPREAD':
+                  return (
+                    <>
+                      <SportGamePickers />
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <FormControl>
+                        <InputLabel id="spread-team">Team</InputLabel>
+                        <Select
+                          labelId="spread-team"
+                          label="Team"
+                          value={pick}
+                          onChange={e => setPick(String(e.target.value))}
+                        >
+                          <MenuItem value="HOME">HOME</MenuItem>
+                          <MenuItem value="AWAY">AWAY</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        label="Spread Points (e.g., -3.5)"
+                        value={spreadPoints}
+                        onChange={e => setSpreadPoints(e.target.value)}
+                        placeholder="-3.5"
+                        inputProps={{ inputMode: 'decimal' }}
+                        required
+                      />
+                      {commonEnd}
+                    </>
+                  );
+                case 'TOTALS':
+                  return (
+                    <>
+                      <SportGamePickers />
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Totals Line (e.g., 210.5)"
+                        value={totalsLine}
+                        onChange={e => setTotalsLine(e.target.value)}
+                        inputProps={{ inputMode: 'decimal' }}
+                        required
+                      />
+                      <FormControl>
+                        <InputLabel id="totals-dir">Direction</InputLabel>
+                        <Select
+                          labelId="totals-dir"
+                          label="Direction"
+                          value={totalsDirection}
+                          onChange={e => setTotalsDirection(e.target.value as 'OVER' | 'UNDER')}
+                        >
+                          <MenuItem value="OVER">OVER</MenuItem>
+                          <MenuItem value="UNDER">UNDER</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {commonEnd}
+                    </>
+                  );
+                case 'PLAYER_PROP':
+                  return (
+                    <>
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField label="Player Name" value={ppPlayerName} onChange={e => setPpPlayerName(e.target.value)} required />
+                      <FormControl>
+                        <InputLabel id="pp-stat">Stat</InputLabel>
+                        <Select
+                          labelId="pp-stat"
+                          label="Stat"
+                          value={ppStatType}
+                          onChange={e => setPpStatType(e.target.value as any)}
+                        >
+                          <MenuItem value="POINTS">POINTS</MenuItem>
+                          <MenuItem value="REBOUNDS">REBOUNDS</MenuItem>
+                          <MenuItem value="ASSISTS">ASSISTS</MenuItem>
+                          <MenuItem value="GOALS">GOALS</MenuItem>
+                          <MenuItem value="SAVES">SAVES</MenuItem>
+                          <MenuItem value="CUSTOM">CUSTOM</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        label="Line (e.g., 22.5)"
+                        value={ppLine}
+                        onChange={e => setPpLine(e.target.value)}
+                        inputProps={{ inputMode: 'decimal' }}
+                        required
+                      />
+                      <FormControl>
+                        <InputLabel id="pp-dir">Direction</InputLabel>
+                        <Select
+                          labelId="pp-dir"
+                          label="Direction"
+                          value={ppDirection}
+                          onChange={e => setPpDirection(e.target.value as any)}
+                        >
+                          <MenuItem value="OVER">OVER</MenuItem>
+                          <MenuItem value="UNDER">UNDER</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {commonEnd}
+                    </>
+                  );
+                case 'TEAM_PROP':
+                  return (
+                    <>
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <FormControl>
+                        <InputLabel id="tp-team">Team</InputLabel>
+                        <Select
+                          labelId="tp-team"
+                          label="Team"
+                          value={tpTeam}
+                          onChange={e => setTpTeam(e.target.value as any)}
+                        >
+                          <MenuItem value="HOME">HOME</MenuItem>
+                          <MenuItem value="AWAY">AWAY</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField label="Prop Type (e.g., TOTAL_POINTS)" value={tpPropType} onChange={e => setTpPropType(e.target.value)} required />
+                      <TextField label="Line (e.g., 100.5)" value={tpLine} onChange={e => setTpLine(e.target.value)} inputProps={{ inputMode: 'decimal' }} required />
+                      <FormControl>
+                        <InputLabel id="tp-dir">Direction</InputLabel>
+                        <Select
+                          labelId="tp-dir"
+                          label="Direction"
+                          value={tpDirection}
+                          onChange={e => setTpDirection(e.target.value as any)}
+                        >
+                          <MenuItem value="OVER">OVER</MenuItem>
+                          <MenuItem value="UNDER">UNDER</MenuItem>
+                        </Select>
+                      </FormControl>
+                      {commonEnd}
+                    </>
+                  );
+                case 'SAME_GAME':
+                  return (
+                    <>
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Legs (one per line)"
+                        value={sgpLegs}
+                        onChange={e => setSgpLegs(e.target.value)}
+                        multiline
+                        minRows={3}
+                        placeholder={`Example:\nHOME -3.5\nPLAYER X OVER 22.5 PTS`}
+                        required
+                      />
+                      {commonEnd}
+                    </>
+                  );
+                case 'PARLAY':
+                  return (
+                    <>
+                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Legs (one per line)"
+                        value={parlayLegs}
+                        onChange={e => setParlayLegs(e.target.value)}
+                        multiline
+                        minRows={3}
+                        placeholder={`Example:\nGAME_A HOME ML\nGAME_B OVER 210.5`}
+                        required
+                      />
+                      {commonEnd}
+                    </>
+                  );
+                default:
+                  return null;
+              }
+            })()}
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MUIButton type="submit" variant="contained">
+                Propose Bet
+              </MUIButton>
+            </div>
+          </form>
+        )}
+      </SectionCard>
+    </>
   );
+
+  const right = (
+    <RightRail>{/* future tips/cards */}</RightRail>
+  );
+
+  return <TwoColumn main={main} right={right} />;
 }
