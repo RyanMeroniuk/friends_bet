@@ -18,14 +18,7 @@ import FormField from '../components/FormField';
 import Input from '../components/Input';
 import Select from '../components/Select';
 
-type MarketType =
-  | 'WINNER'
-  | 'SPREAD'
-  | 'TOTALS'
-  | 'PLAYER_PROP'
-  | 'TEAM_PROP'
-  | 'SAME_GAME'
-  | 'PARLAY';
+type MarketType = 'WINNER' | 'SPREAD' | 'TOTALS';
 
 type BetStatusFilter = 'all' | 'open' | 'accepted' | 'resolved' | 'void';
 
@@ -46,6 +39,7 @@ type BetPrefs = {
 
 const AMOUNT_PRESETS = [500, 1000, 2500, 5000];
 const ODDS_PRESETS = [1.5, 1.7, 1.9, 2.2];
+const MARKET_TYPES: MarketType[] = ['WINNER', 'SPREAD', 'TOTALS'];
 
 export default function BetPage() {
   const initialPrefs: BetPrefs = (() => {
@@ -74,7 +68,10 @@ export default function BetPage() {
   const { user } = useAuth();
   const userId = user?.id ?? '';
   const [gameId, setGameId] = useState<string>(initialPrefs.selectedGameId || '');
-  const [marketType, setMarketType] = useState<MarketType>(initialPrefs.marketType || 'WINNER');
+  const initialMarketType = MARKET_TYPES.includes(initialPrefs.marketType as MarketType)
+    ? (initialPrefs.marketType as MarketType)
+    : 'WINNER';
+  const [marketType, setMarketType] = useState<MarketType>(initialMarketType);
   const [pick, setPick] = useState<string>('HOME');
   const [amountCents, setAmountCents] = useState<string>(initialPrefs.amountCents || '');
   const [odds, setOdds] = useState<number>(typeof initialPrefs.odds === 'number' ? initialPrefs.odds : 1.8);
@@ -82,19 +79,6 @@ export default function BetPage() {
   const [spreadPoints, setSpreadPoints] = useState<string>('');
   const [totalsLine, setTotalsLine] = useState<string>('');
   const [totalsDirection, setTotalsDirection] = useState<'OVER' | 'UNDER'>('OVER');
-
-  const [ppPlayerName, setPpPlayerName] = useState('');
-  const [ppStatType, setPpStatType] = useState<'POINTS' | 'REBOUNDS' | 'ASSISTS' | 'GOALS' | 'SAVES' | 'CUSTOM'>('POINTS');
-  const [ppLine, setPpLine] = useState<string>('');
-  const [ppDirection, setPpDirection] = useState<'OVER' | 'UNDER'>('OVER');
-
-  const [tpTeam, setTpTeam] = useState<'HOME' | 'AWAY'>('HOME');
-  const [tpPropType, setTpPropType] = useState('TOTAL_POINTS');
-  const [tpLine, setTpLine] = useState<string>('');
-  const [tpDirection, setTpDirection] = useState<'OVER' | 'UNDER'>('OVER');
-
-  const [sgpLegs, setSgpLegs] = useState<string>('');
-  const [parlayLegs, setParlayLegs] = useState<string>('');
 
   const [sports, setSports] = useState<string[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>(initialPrefs.selectedSport || '');
@@ -214,10 +198,10 @@ export default function BetPage() {
   }, [selectedSport]); // eslint-disable-line
 
   function resetMarketSpecificFields() {
-    setSpreadPoints(''); setTotalsLine(''); setTotalsDirection('OVER');
-    setPpPlayerName(''); setPpStatType('POINTS'); setPpLine(''); setPpDirection('OVER');
-    setTpTeam('HOME'); setTpPropType('TOTAL_POINTS'); setTpLine(''); setTpDirection('OVER');
-    setSgpLegs(''); setParlayLegs('');
+    setPick('HOME');
+    setSpreadPoints('');
+    setTotalsLine('');
+    setTotalsDirection('OVER');
   }
 
   function round2(n: number) { return Math.round(n * 100) / 100; }
@@ -259,14 +243,13 @@ export default function BetPage() {
     const amt = parseInt(amountCents, 10);
     if (Number.isNaN(amt) || amt <= 0) return 'Amount must be a positive integer (in cents)';
     if (Number.isNaN(odds) || odds <= 1.0) return 'Odds must be > 1.0';
-    switch (marketType) {
-      case 'SPREAD': { const pts = Number(spreadPoints); if (Number.isNaN(pts)) return 'Enter a valid spread (e.g., -3.5)'; break; }
-      case 'TOTALS': { const n = parseFloat(totalsLine); if (Number.isNaN(n)) return 'Totals line must be a number'; break; }
-      case 'PLAYER_PROP': { if (!ppPlayerName.trim()) return 'Player name is required'; const n = parseFloat(ppLine); if (Number.isNaN(n)) return 'Player prop line must be a number'; break; }
-      case 'TEAM_PROP': { const n = parseFloat(tpLine); if (Number.isNaN(n)) return 'Team prop line must be a number'; if (!tpPropType.trim()) return 'Team prop type is required'; break; }
-      case 'SAME_GAME': { const legs = sgpLegs.split('\n').map(s => s.trim()).filter(Boolean); if (!legs.length) return 'Add at least one SGP leg'; break; }
-      case 'PARLAY': { const legs = parlayLegs.split('\n').map(s => s.trim()).filter(Boolean); if (!legs.length) return 'Add at least one Parlay leg'; break; }
-      default: break;
+    if (marketType === 'SPREAD') {
+      const pts = Number(spreadPoints);
+      if (Number.isNaN(pts)) return 'Enter a valid spread (e.g., -3.5)';
+    }
+    if (marketType === 'TOTALS') {
+      const n = parseFloat(totalsLine);
+      if (Number.isNaN(n)) return 'Totals line must be a number';
     }
     return null;
   })();
@@ -279,17 +262,15 @@ export default function BetPage() {
     let details: Record<string, any> | undefined;
     let submitPick = pick;
     switch (marketType) {
-      case 'SPREAD': details = { spreadPoints: Number(spreadPoints) }; break;
-      case 'TOTALS': details = { totalLine: parseFloat(totalsLine) }; submitPick = totalsDirection; break;
-      case 'PLAYER_PROP':
-        details = { playerName: ppPlayerName.trim(), statType: ppStatType, line: parseFloat(ppLine), direction: ppDirection };
-        submitPick = ppDirection; break;
-      case 'TEAM_PROP':
-        details = { team: tpTeam, propType: tpPropType.trim(), line: parseFloat(tpLine), direction: tpDirection };
-        submitPick = tpTeam; break;
-      case 'SAME_GAME': details = { legs: sgpLegs.split('\n').map(s => s.trim()).filter(Boolean) }; submitPick = 'SGP'; break;
-      case 'PARLAY': details = { legs: parlayLegs.split('\n').map(s => s.trim()).filter(Boolean) }; submitPick = 'PARLAY'; break;
-      default: break;
+      case 'SPREAD':
+        details = { spreadPoints: Number(spreadPoints) };
+        break;
+      case 'TOTALS':
+        details = { totalLine: parseFloat(totalsLine) };
+        submitPick = totalsDirection;
+        break;
+      default:
+        break;
     }
 
     try {
@@ -723,14 +704,10 @@ export default function BetPage() {
                 <option value="WINNER">Moneyline (WINNER)</option>
                 <option value="SPREAD">Spread</option>
                 <option value="TOTALS">Totals (O/U)</option>
-                <option value="PLAYER_PROP">Player Prop</option>
-                <option value="TEAM_PROP">Team Prop</option>
-                <option value="SAME_GAME">Same Game (SGP)</option>
-                <option value="PARLAY">Parlay</option>
               </Select>
             </FormField>
 
-            {marketType !== 'PLAYER_PROP' && marketType !== 'TEAM_PROP' && marketType !== 'PARLAY' && (<SportGamePickers />)}
+            <SportGamePickers />
 
             {(() => {
               const commonEnd = (
@@ -867,134 +844,6 @@ export default function BetPage() {
                           <option value="OVER">OVER</option>
                           <option value="UNDER">UNDER</option>
                         </Select>
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                case 'PLAYER_PROP':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-pp-game" helperText="Use a game where the player appears" required>
-                        <Input id="bet-pp-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Use a game where the player appears" required />
-                      </FormField>
-                      <FormField label="Player Name" htmlFor="bet-pp-player" required>
-                        <Input id="bet-pp-player" value={ppPlayerName} onChange={e => setPpPlayerName(e.target.value)} placeholder="Player name" required />
-                      </FormField>
-                      <FormField label="Stat" htmlFor="bet-pp-stat" helperText="Choose the statistic" required>
-                        <Select
-                          id="bet-pp-stat"
-                          value={ppStatType}
-                          onChange={e => setPpStatType(e.target.value as typeof ppStatType)}
-                        >
-                          <option value="POINTS">POINTS</option>
-                          <option value="REBOUNDS">REBOUNDS</option>
-                          <option value="ASSISTS">ASSISTS</option>
-                          <option value="GOALS">GOALS</option>
-                          <option value="SAVES">SAVES</option>
-                          <option value="CUSTOM">CUSTOM</option>
-                        </Select>
-                      </FormField>
-                      <FormField label="Line" htmlFor="bet-pp-line" helperText="Value for the prop" required>
-                        <Input
-                          id="bet-pp-line"
-                          value={ppLine}
-                          onChange={e => setPpLine(e.target.value)}
-                          inputMode="decimal"
-                          placeholder="e.g., 22.5"
-                          required
-                        />
-                      </FormField>
-                      <FormField label="Direction" htmlFor="bet-pp-direction" helperText="Over/Under on the player line" required>
-                        <Select
-                          id="bet-pp-direction"
-                          value={ppDirection}
-                          onChange={e => setPpDirection(e.target.value as typeof ppDirection)}
-                        >
-                          <option value="OVER">OVER</option>
-                          <option value="UNDER">UNDER</option>
-                        </Select>
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                case 'TEAM_PROP':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-tp-game" helperText="Auto-set when you choose a game" required>
-                        <Input id="bet-tp-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
-                      </FormField>
-                      <FormField label="Team" htmlFor="bet-tp-team" helperText="Which team the prop applies to" required>
-                        <Select
-                          id="bet-tp-team"
-                          value={tpTeam}
-                          onChange={e => setTpTeam(e.target.value as typeof tpTeam)}
-                        >
-                          <option value="HOME">HOME</option>
-                          <option value="AWAY">AWAY</option>
-                        </Select>
-                      </FormField>
-                      <FormField label="Prop Type" htmlFor="bet-tp-type" helperText="e.g., TOTAL_POINTS" required>
-                        <Input id="bet-tp-type" value={tpPropType} onChange={e => setTpPropType(e.target.value)} placeholder="e.g., TOTAL_POINTS" required />
-                      </FormField>
-                      <FormField label="Line" htmlFor="bet-tp-line" helperText="Numeric value for the prop" required>
-                        <Input
-                          id="bet-tp-line"
-                          value={tpLine}
-                          onChange={e => setTpLine(e.target.value)}
-                          inputMode="decimal"
-                          placeholder="e.g., 100.5"
-                          required
-                        />
-                      </FormField>
-                      <FormField label="Direction" htmlFor="bet-tp-direction" helperText="Over/Under on the team line" required>
-                        <Select
-                          id="bet-tp-direction"
-                          value={tpDirection}
-                          onChange={e => setTpDirection(e.target.value as typeof tpDirection)}
-                        >
-                          <option value="OVER">OVER</option>
-                          <option value="UNDER">UNDER</option>
-                        </Select>
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                case 'SAME_GAME':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-sgp-game" helperText="The game your SGP applies to" required>
-                        <Input id="bet-sgp-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="The game your SGP applies to" required />
-                      </FormField>
-                      <FormField label="Legs (one per line)" htmlFor="bet-sgp-legs" helperText="Add each leg on a new line" required>
-                        <textarea
-                          id="bet-sgp-legs"
-                          className="fb-input"
-                          rows={3}
-                          value={sgpLegs}
-                          onChange={e => setSgpLegs(e.target.value)}
-                          placeholder={`Example:\nHOME -3.5\nPLAYER X OVER 22.5 PTS`}
-                          required
-                        />
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                case 'PARLAY':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-parlay-game" helperText="Any related game ID (admin note)" required>
-                        <Input id="bet-parlay-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Any related game ID (admin note)" required />
-                      </FormField>
-                      <FormField label="Legs (one per line)" htmlFor="bet-parlay-legs" helperText="Add each leg on a new line" required>
-                        <textarea
-                          id="bet-parlay-legs"
-                          className="fb-input"
-                          rows={3}
-                          value={parlayLegs}
-                          onChange={e => setParlayLegs(e.target.value)}
-                          placeholder={`Example:\nGAME_A HOME ML\nGAME_B OVER 210.5`}
-                          required
-                        />
                       </FormField>
                       {commonEnd}
                     </>
