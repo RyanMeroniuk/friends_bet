@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { listMyGroups, GroupResponse } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import { listGames, GameSummary } from '../api/game';
@@ -10,21 +10,26 @@ import {
   Select,
   InputLabel,
   FormControl,
+  FormHelperText,
 } from '@mui/material';
 
 import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi } from '../api/bet';
 import { useAuth } from '../context/AuthContext';
 
-/* Shared layout + cards to match Wallet */
+/* Shared layout + cards (consistent with Wallet) */
 import TwoColumn from '../components/TwoColumn';
 import SectionCard from '../components/SectionCard';
 import RightRail from '../components/RightRail';
+import EmptyState from '../components/EmptyState';
 
-/* Group selector strip (same as Wallet) */
+/* Group selector strip (reuse) */
 import GroupScroller, { GroupChip } from '../components/GroupScroller';
 
-/* Header you named */
+/* Your header component */
 import BetHeader from '../components/BetHeader';
+
+/* Toasts (reuse) */
+import { ToastContainer, ToastItem } from '../components/Toast';
 
 type MarketType =
   | 'WINNER'
@@ -35,27 +40,70 @@ type MarketType =
   | 'SAME_GAME'
   | 'PARLAY';
 
+type BetStatusFilter = 'all' | 'open' | 'accepted' | 'resolved' | 'void';
+
 const DAYS_WINDOW = 2; // next 2 days per backend endpoints
 const API_BASE = (process.env.REACT_APP_API_BASE || '').replace(/\/$/, '');
 
+/* --- Persistence Key (extended in Step 10 to include selectedGroup) --- */
+const LS_KEY = 'fb_bets_prefs_v2';
+type BetPrefs = {
+  selectedGroup?: string;
+  selectedSport?: string;
+  selectedGameId?: string;
+  marketType?: MarketType;
+  amountCents?: string;
+  odds?: number;
+  betSearch?: string;
+  statusTab?: BetStatusFilter;
+};
+
+const AMOUNT_PRESETS = [500, 1000, 2500, 5000]; // cents: $5, $10, $25, $50
+const ODDS_PRESETS = [1.5, 1.7, 1.9, 2.2];
+
 export default function BetPage() {
-  // groups + selection
+  // load prefs from localStorage (safe parse)
+  const initialPrefs: BetPrefs = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {};
+    } catch {
+      return {};
+    }
+  })();
+
+  // groups + selection (persisted)
   const [groups, setGroups] = useState<GroupResponse[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [selectedGroup, setSelectedGroup] = useState<string>(initialPrefs.selectedGroup || '');
+  const selectedGroupName = groups.find(g => g.id === selectedGroup)?.name ?? '—';
 
   // list + feedback
   const [bets, setBets] = useState<Bet[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingBets, setLoadingBets] = useState<boolean>(false);
+
+  // last refreshed (for odds/games OR bets reloads)
+  const [lastRefreshed, setLastRefreshed] = useState<number>(Date.now());
+
+  // Toasts
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  function pushToast(text: string, tone: ToastItem['tone'] = 'info') {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setToasts(prev => [...prev, { id, text, tone }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2600);
+  }
+  function closeToast(id: string) {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }
 
   // propose form state
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const [gameId, setGameId] = useState<string>('');
-  const [marketType, setMarketType] = useState<MarketType>('WINNER');
+  const [gameId, setGameId] = useState<string>(initialPrefs.selectedGameId || '');
+  const [marketType, setMarketType] = useState<MarketType>(initialPrefs.marketType || 'WINNER');
   const [pick, setPick] = useState<string>('HOME'); // WINNER/SPREAD team
-  const [amountCents, setAmountCents] = useState<string>(''); // free typing
-  const [odds, setOdds] = useState<number>(1.8);
+  const [amountCents, setAmountCents] = useState<string>(initialPrefs.amountCents || '');
+  const [odds, setOdds] = useState<number>(typeof initialPrefs.odds === 'number' ? initialPrefs.odds : 1.8);
 
   // SPREAD
   const [spreadPoints, setSpreadPoints] = useState<string>(''); // "-3.5"
@@ -80,13 +128,15 @@ export default function BetPage() {
   const [sgpLegs, setSgpLegs] = useState<string>('');
   const [parlayLegs, setParlayLegs] = useState<string>('');
 
-  // sports + games
+  // sports + games (+ loading flags)
   const [sports, setSports] = useState<string[]>([]);
-  const [selectedSport, setSelectedSport] = useState<string>('');
+  const [selectedSport, setSelectedSport] = useState<string>(initialPrefs.selectedSport || '');
   const [sportsError, setSportsError] = useState<string | null>(null);
+  const [sportsLoading, setSportsLoading] = useState<boolean>(false);
 
-  // games
+  // games (+ loading flag)
   const [games, setGames] = useState<GameSummary[]>([]);
+  const [gamesLoading, setGamesLoading] = useState<boolean>(false);
   const selectedGame = useMemo(
     () => games.find(g => g.id === gameId),
     [games, gameId]
@@ -96,6 +146,38 @@ export default function BetPage() {
   const [busyRefresh, setBusyRefresh] = useState(false);
   const [busySettle, setBusySettle] = useState(false);
 
+  // global search + status tab
+  const [betSearch, setBetSearch] = useState<string>(initialPrefs.betSearch || '');
+  const [statusTab, setStatusTab] = useState<BetStatusFilter>(initialPrefs.statusTab || 'all');
+
+  // anchors/refs
+  const proposeRef = useRef<HTMLDivElement | null>(null);
+  const openRef = useRef<HTMLDivElement | null>(null);
+  const groupStripRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // selected bet for details panel
+  const [selectedBetId, setSelectedBetId] = useState<string | null>(null);
+  const selectedBet = useMemo(
+    () => bets.find(b => b.id === selectedBetId) || null,
+    [bets, selectedBetId]
+  );
+
+  // ------- persist prefs (including selectedGroup in Step 10) -------
+  useEffect(() => {
+    const prefs: BetPrefs = {
+      selectedGroup,
+      selectedSport,
+      selectedGameId: gameId,
+      marketType,
+      amountCents,
+      odds,
+      betSearch,
+      statusTab,
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(prefs));
+  }, [selectedGroup, selectedSport, gameId, marketType, amountCents, odds, betSearch, statusTab]);
+
   // ------- load groups -------
   useEffect(() => {
     if (!userId) return;
@@ -104,19 +186,41 @@ export default function BetPage() {
         setGroups(mine);
         if (!selectedGroup && mine.length > 0) setSelectedGroup(mine[0].id);
       })
-      .catch(() => setError('Could not load your groups'));
-  }, [userId]);
+      .catch(() => {
+        setError('Could not load your groups');
+        pushToast('Could not load your groups', 'error');
+      });
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ------- load bets when group changes -------
   useEffect(() => {
     if (!selectedGroup) return;
     loadBets();
+    setSelectedBetId(null); // clear focus when switching groups
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroup]);
 
-  // ------- load sports (next 2 days) -------
+  async function loadBets() {
+    try {
+      setLoadingBets(true);
+      setError(null);
+      const data = await listBets(selectedGroup);
+      setBets(data);
+      setLastRefreshed(Date.now());
+    } catch (e: any) {
+      const msg = e?.response?.data || 'Could not load bets';
+      setError(msg);
+      pushToast(msg, 'error');
+    } finally {
+      setLoadingBets(false);
+    }
+  }
+
+  // ------- load sports (next 2 days) with loading flag -------
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setSportsLoading(true);
       setSportsError(null);
       try {
         const res = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
@@ -126,20 +230,31 @@ export default function BetPage() {
         const list: string[] = await res.json();
         if (!cancelled) {
           setSports(list || []);
-          if (!selectedSport && list?.length) setSelectedSport(list[0]);
+          // respect persisted sport if still valid; else first
+          if (list?.length) {
+            setSelectedSport(prev => (prev && list.includes(prev)) ? prev : list[0]);
+          } else {
+            setSelectedSport('');
+          }
         }
       } catch {
-        if (!cancelled) setSportsError('Could not load sports');
+        if (!cancelled) {
+          setSportsError('Could not load sports');
+          pushToast('Could not load sports', 'error');
+        }
+      } finally {
+        if (!cancelled) setSportsLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ------- load games whenever sport changes -------
+  // ------- load games whenever sport changes (with loading) -------
   useEffect(() => {
-    if (!selectedSport) return;
+    if (!selectedSport) { setGames([]); setGameId(''); return; }
     let cancelled = false;
     (async () => {
+      setGamesLoading(true);
       try {
         const res = await fetch(
           `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
@@ -155,20 +270,23 @@ export default function BetPage() {
         }));
         if (!cancelled) {
           setGames(mapped);
+          // if persisted gameId isn't in the new list, fall back to first
           if (mapped.length > 0) {
-            setGameId(prev => prev || mapped[0].id);
+            setGameId(prev => (prev && mapped.some(m => m.id === prev)) ? prev : mapped[0].id);
           } else {
             setGameId('');
           }
         }
       } catch {
-        // ignore; manual Game ID still works
+        // leave silent; Game ID manual input still works
+      } finally {
+        if (!cancelled) setGamesLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [selectedSport]);
 
-  // ------- existing: initial listGames fallback -------
+  // ------- initial listGames fallback (when no selectedSport) -------
   useEffect(() => {
     if (selectedSport) return;
     (async () => {
@@ -179,17 +297,7 @@ export default function BetPage() {
         console.warn('Failed to load games', e);
       }
     })();
-  }, [selectedSport]);
-
-  async function loadBets() {
-    try {
-      setError(null);
-      const data = await listBets(selectedGroup);
-      setBets(data);
-    } catch (e: any) {
-      setError(e.response?.data || 'Could not load bets');
-    }
-  }
+  }, [selectedSport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function resetMarketSpecificFields() {
     setSpreadPoints('');
@@ -252,74 +360,111 @@ export default function BetPage() {
     if (selectedGame) prefillFromGame(selectedGame, next);
   }
 
+  // ---- live math helpers ----
+  const stake = (parseInt(amountCents || '0', 10) || 0) / 100;
+  const potentialPayout = stake > 0 && odds > 1 ? stake * odds : 0;
+  const potentialWin = stake > 0 && odds > 1 ? stake * (odds - 1) : 0;
+
+  // ---- UI validation (disable submit if invalid) ----
+  const formError = (() => {
+    if (!userId) return 'User session missing';
+    if (!selectedGroup) return 'Select a group';
+    if (!gameId.trim()) return 'Game ID is required';
+    if (amountCents.trim() === '') return 'Amount (cents) is required';
+    const amt = parseInt(amountCents, 10);
+    if (Number.isNaN(amt) || amt <= 0) return 'Amount must be a positive integer (in cents)';
+    if (Number.isNaN(odds) || odds <= 1.0) return 'Odds must be > 1.0';
+
+    switch (marketType) {
+      case 'SPREAD': {
+        const pts = Number(spreadPoints);
+        if (Number.isNaN(pts)) return 'Enter a valid spread (e.g., -3.5)';
+        break;
+      }
+      case 'TOTALS': {
+        const lineNum = parseFloat(totalsLine);
+        if (Number.isNaN(lineNum)) return 'Totals line must be a number';
+        break;
+      }
+      case 'PLAYER_PROP': {
+        if (!ppPlayerName.trim()) return 'Player name is required';
+        const lineNum = parseFloat(ppLine);
+        if (Number.isNaN(lineNum)) return 'Player prop line must be a number';
+        break;
+      }
+      case 'TEAM_PROP': {
+        const lineNum = parseFloat(tpLine);
+        if (Number.isNaN(lineNum)) return 'Team prop line must be a number';
+        if (!tpPropType.trim()) return 'Team prop type is required';
+        break;
+      }
+      case 'SAME_GAME': {
+        const legs = sgpLegs.split('\n').map(s => s.trim()).filter(Boolean);
+        if (legs.length === 0) return 'Add at least one SGP leg';
+        break;
+      }
+      case 'PARLAY': {
+        const legs = parlayLegs.split('\n').map(s => s.trim()).filter(Boolean);
+        if (legs.length === 0) return 'Add at least one Parlay leg';
+        break;
+      }
+      default:
+        break;
+    }
+    return null;
+  })();
+  const submitDisabled = !!formError;
+
   async function onPropose() {
     setMessage(null);
     setError(null);
 
-    if (!userId) return setError('User session missing');
-    if (!selectedGroup) return setError('Select a group first');
-    if (!gameId.trim()) return setError('Game ID is required');
-
-    // amount — free-typing, digits only
-    if (amountCents.trim() === '') return setError('Amount (cents) is required');
-    const amt = parseInt(amountCents, 10);
-    if (Number.isNaN(amt) || amt <= 0) return setError('Amount (cents) must be a positive integer');
-
-    if (Number.isNaN(odds) || odds <= 1.0) return setError('Odds must be > 1.0');
+    if (submitDisabled) {
+      if (formError) { setError(formError); pushToast(formError, 'error'); }
+      return;
+    }
 
     let details: Record<string, any> | undefined;
     let submitPick = pick; // default
 
     switch (marketType) {
       case 'SPREAD': {
-        const pts = Number(spreadPoints);
-        if (Number.isNaN(pts)) return setError('Enter a valid spread (e.g., -3.5)');
-        details = { spreadPoints: pts };
+        details = { spreadPoints: Number(spreadPoints) };
         break;
       }
       case 'TOTALS': {
-        const lineNum = parseFloat(totalsLine);
-        if (Number.isNaN(lineNum)) return setError('Totals line must be a number');
-        details = { totalLine: lineNum };
+        details = { totalLine: parseFloat(totalsLine) };
         submitPick = totalsDirection; // OVER/UNDER
         break;
       }
       case 'PLAYER_PROP': {
-        if (!ppPlayerName.trim()) return setError('Player name is required');
-        const lineNum = parseFloat(ppLine);
-        if (Number.isNaN(lineNum)) return setError('Player prop line must be a number');
         details = {
           playerName: ppPlayerName.trim(),
           statType: ppStatType,
-          line: lineNum,
+          line: parseFloat(ppLine),
           direction: ppDirection,
         };
         submitPick = ppDirection;
         break;
       }
       case 'TEAM_PROP': {
-        const lineNum = parseFloat(tpLine);
-        if (Number.isNaN(lineNum)) return setError('Team prop line must be a number');
-        if (!tpPropType.trim()) return setError('Team prop type is required');
         details = {
           team: tpTeam,
           propType: tpPropType.trim(),
-          line: lineNum,
+          line: parseFloat(tpLine),
           direction: tpDirection,
         };
         submitPick = tpTeam; // HOME/AWAY
         break;
       }
       case 'SAME_GAME': {
-        const legs = parlayLegs.split('\n').map(s => s.trim()).filter(Boolean);
-        if (legs.length === 0) return setError('Add at least one SGP leg (one per line)');
+        const legs = sgpLegs.split('\n').map(s => s.trim()).filter(Boolean);
         details = { legs };
         submitPick = 'SGP';
         break;
       }
       case 'PARLAY': {
         const legs = parlayLegs.split('\n').map(s => s.trim()).filter(Boolean);
-        if (legs.length === 0) return setError('Add at least one Parlay leg (one per line)');
         details = { legs };
         submitPick = 'PARLAY';
         break;
@@ -335,17 +480,19 @@ export default function BetPage() {
         gameId.trim(),
         marketType,
         submitPick.toUpperCase(),
-        amt,
+        parseInt(amountCents, 10),
         odds,
         details
       );
       setMessage('Bet proposed!');
-      setAmountCents('');
-      setOdds(1.8);
+      pushToast('Bet proposed!', 'success');
+      // keep amount/odds as-is (so user can submit similar), but clear market-specific fields
       resetMarketSpecificFields();
       loadBets();
     } catch (e: any) {
-      setError(e.response?.data || 'Error proposing bet');
+      const msg = e.response?.data || 'Error proposing bet';
+      setError(msg);
+      pushToast(msg, 'error');
     }
   }
 
@@ -353,15 +500,18 @@ export default function BetPage() {
     setMessage(null);
     setError(null);
     if (!userId) {
-      setError('User session missing');
-      return;
+      const msg = 'User session missing';
+      setError(msg); pushToast(msg, 'error'); return;
     }
     try {
       await acceptBet(betId, userId);
       setMessage('Bet accepted!');
+      pushToast('Bet accepted!', 'success');
       loadBets();
     } catch (e: any) {
-      setError(e.response?.data || 'Error accepting bet');
+      const msg = e.response?.data || 'Error accepting bet';
+      setError(msg);
+      pushToast(msg, 'error');
     }
   }
 
@@ -373,6 +523,8 @@ export default function BetPage() {
 
       await refreshSports(selectedSport || undefined);
 
+      // re-pull sports
+      setSportsLoading(true);
       const resSports = await fetch(`${API_BASE}/sports?days=${DAYS_WINDOW}`, {
         headers: { Accept: 'application/json' },
       });
@@ -381,8 +533,11 @@ export default function BetPage() {
         setSports(list || []);
         if (!selectedSport && list?.length) setSelectedSport(list[0]);
       }
+      setSportsLoading(false);
 
+      // re-pull games
       if (selectedSport) {
+        setGamesLoading(true);
         const resGames = await fetch(
           `${API_BASE}/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS_WINDOW}`,
           { headers: { Accept: 'application/json' } }
@@ -396,17 +551,20 @@ export default function BetPage() {
             startTime: g.startTime,
           }));
           setGames(mapped);
-          if (mapped.length > 0) setGameId(prev => prev || mapped[0].id);
+          if (mapped.length > 0) setGameId(prev => (prev && mapped.some(m => m.id === prev)) ? prev : mapped[0].id);
         }
+        setGamesLoading(false);
       }
 
-      setMessage('Sports & games refreshed.');
+      setLastRefreshed(Date.now());
+      pushToast('Sports & games refreshed.', 'success');
     } catch (e: any) {
       const data = e?.response?.data;
       const msg = (data && typeof data === 'object' && 'message' in data)
         ? (data as any).message
         : (typeof data === 'string' ? data : e?.message);
       setError(msg || 'Failed to refresh sports/games');
+      pushToast(msg || 'Failed to refresh sports/games', 'error');
     } finally {
       setBusyRefresh(false);
     }
@@ -421,15 +579,26 @@ export default function BetPage() {
 
       const res = await settleAcceptedBetsApi(selectedGroup);
       await loadBets();
-      setMessage(`Settlement check complete${typeof res?.settled === 'number' ? ` — ${res.settled} settled.` : '.'}`);
+      const msg =
+        typeof (res as any)?.settled === 'number'
+          ? `Settlement check complete — ${(res as any).settled} settled.`
+          : 'Settlement check complete.';
+      pushToast(msg, 'success');
     } catch (e: any) {
-      setError(e?.message || 'Failed to settle accepted bets');
+      const msg = e?.message || 'Failed to settle accepted bets';
+      setError(msg);
+      pushToast(msg, 'error');
     } finally {
       setBusySettle(false);
     }
   }
 
   function SportGamePickers() {
+    const sportHelper =
+      sportsLoading
+        ? 'Loading sports…'
+        : (sportsError ? sportsError : (selectedSport ? `Games: ${games.length}` : 'Pick a sport to load games'));
+
     return (
       <>
         <FormControl>
@@ -440,12 +609,15 @@ export default function BetPage() {
             value={selectedSport}
             onChange={e => setSelectedSport(String(e.target.value))}
             displayEmpty
+            disabled={sportsLoading}
           >
-            {sports.length === 0 && <MenuItem value=""><em>No sports</em></MenuItem>}
-            {sports.map(s => (
+            {sportsLoading && <MenuItem value=""><em>Loading…</em></MenuItem>}
+            {!sportsLoading && sports.length === 0 && <MenuItem value=""><em>No sports</em></MenuItem>}
+            {!sportsLoading && sports.map(s => (
               <MenuItem key={s} value={s}>{s}</MenuItem>
             ))}
           </Select>
+          <FormHelperText>{sportHelper}</FormHelperText>
         </FormControl>
 
         <FormControl>
@@ -456,13 +628,19 @@ export default function BetPage() {
             value={gameId}
             onChange={e => handlePickGame(String(e.target.value))}
             displayEmpty
+            disabled={gamesLoading || !selectedSport}
           >
-            {games.map(g => (
+            {gamesLoading && <MenuItem value=""><em>Loading…</em></MenuItem>}
+            {!gamesLoading && games.length === 0 && <MenuItem value=""><em>No games</em></MenuItem>}
+            {!gamesLoading && games.map(g => (
               <MenuItem key={g.id} value={g.id}>
                 {g.homeTeam} vs {g.awayTeam} — {new Date(g.startTime).toLocaleString()}
               </MenuItem>
             ))}
           </Select>
+          <FormHelperText>
+            {gamesLoading ? 'Loading games…' : (selectedSport ? `${games.length} game${games.length === 1 ? '' : 's'}` : 'Select a sport to show games')}
+          </FormHelperText>
         </FormControl>
       </>
     );
@@ -490,10 +668,7 @@ export default function BetPage() {
     }
   }
 
-  const selectedGroupName =
-    groups.find(g => g.id === selectedGroup)?.name ?? '—';
-
-  // Adapt API groups to GroupScroller chips (minimal fields; UI-only)
+  // Adapt API groups to GroupScroller chips
   const groupChips: GroupChip[] = groups.map((g) => ({
     id: g.id,
     name: g.name,
@@ -502,6 +677,217 @@ export default function BetPage() {
     winRatePct: 0,
   })) as GroupChip[];
 
+  // ---- global (optional) text search ----
+  const q = betSearch.trim().toLowerCase();
+  const bySearch = (b: Bet) => {
+    if (!q) return true;
+    const hay = `${b.marketType} ${b.pick} ${b.gameId} ${b.status} ${formatPick(b)}`.toLowerCase();
+    return hay.includes(q);
+  };
+
+  // ---- status filtering (tabs) ----
+  const matchStatusTab = (b: Bet) => {
+    switch (statusTab) {
+      case 'open': return b.status === 'OPEN';
+      case 'accepted': return b.status === 'ACCEPTED';
+      case 'resolved': return b.status === 'RESOLVED';
+      case 'void': return b.status === 'VOID';
+      default: return true;
+    }
+  };
+
+  // Base lists
+  const openAll = (bets || []).filter(b => b.status === 'OPEN');
+  const acceptedAll = (bets || []).filter(b => b.status === 'ACCEPTED');
+  const resolvedAll = (bets || []).filter(b => b.status === 'RESOLVED');
+  const voidAll = (bets || []).filter(b => b.status === 'VOID');
+
+  // Visible lists (respect search + tab)
+  const openBets = useMemo(
+    () => openAll.filter(bySearch).filter(matchStatusTab),
+    [bets, betSearch, statusTab]
+  );
+  const acceptedBets = useMemo(
+    () => acceptedAll.filter(bySearch).filter(matchStatusTab),
+    [bets, betSearch, statusTab]
+  );
+  const resolvedBets = useMemo(
+    () => resolvedAll.filter(bySearch).filter(matchStatusTab),
+    [bets, betSearch, statusTab]
+  );
+  const voidBets = useMemo(
+    () => voidAll.filter(bySearch).filter(matchStatusTab),
+    [bets, betSearch, statusTab]
+  );
+
+  // ---- tiny skeleton card ----
+  function SkeletonCard() {
+    return (
+      <div
+        style={{
+          border: '1px solid var(--fb-border)',
+          background: 'var(--fb-surface)',
+          borderRadius: 16,
+          padding: 16,
+          display: 'grid',
+          gap: 12,
+        }}
+      >
+        <div className="fb-skeleton" style={{ height: 18, width: '60%' }} />
+        <div className="fb-kv">
+          <div className="fb-kv__row">
+            <span className="fb-skeleton" style={{ height: 12, width: 60 }} />
+            <span className="fb-skeleton" style={{ height: 12, width: 80 }} />
+          </div>
+          <div className="fb-kv__row">
+            <span className="fb-skeleton" style={{ height: 12, width: 50 }} />
+            <span className="fb-skeleton" style={{ height: 12, width: 70 }} />
+          </div>
+          <div className="fb-kv__row">
+            <span className="fb-skeleton" style={{ height: 12, width: 64 }} />
+            <span className="fb-skeleton" style={{ height: 12, width: 64 }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', borderTop: '1px solid var(--fb-border)', paddingTop: 12 }}>
+          <div className="fb-skeleton" style={{ height: 12, width: 120 }} />
+          <div style={{ marginLeft: 'auto' }}>
+            <div className="fb-skeleton" style={{ height: 34, width: 94, borderRadius: 10 }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function BetCard(b: Bet) {
+    const tone = statusTone(b.status);
+    const isSelected = b.id === selectedBetId;
+    return (
+      <button
+        key={b.id}
+        type="button"
+        onClick={() => setSelectedBetId(isSelected ? null : b.id)}
+        className="fb-fade"
+        style={{
+          textAlign: 'left',
+          border: `1px solid ${isSelected ? 'var(--fb-accent-2)' : 'var(--fb-border)'}`,
+          background: 'var(--fb-surface)',
+          borderRadius: 16,
+          padding: 16,
+          display: 'grid',
+          gap: 12,
+          cursor: 'pointer',
+        }}
+        aria-pressed={isSelected}
+        aria-label={`Select bet ${b.id}`}
+      >
+        {/* Header row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, color: 'var(--fb-text)', fontSize: 18 }}>
+            {b.gameId}
+          </div>
+          <span
+            className="fb-badge"
+            style={{
+              background: tone.bg,
+              color: tone.text,
+              borderColor: 'var(--fb-border)',
+              fontWeight: 700,
+            }}
+          >
+            {b.status}
+          </span>
+        </div>
+
+        {/* Key-Value rows */}
+        <div className="fb-kv">
+          <div className="fb-kv__row">
+            <span className="fb-kv__label">Market:</span>
+            <span className="fb-kv__value">{b.marketType}</span>
+          </div>
+          <div className="fb-kv__row">
+            <span className="fb-kv__label">Pick:</span>
+            <span className="fb-kv__value">{formatPick(b)}</span>
+          </div>
+          <div className="fb-kv__row">
+            <span className="fb-kv__label">Amount:</span>
+            <span className="fb-kv__value">${(b.amountCents / 100).toFixed(2)}</span>
+          </div>
+          <div className="fb-kv__row">
+            <span className="fb-kv__label">Odds:</span>
+            <span className="fb-kv__value">{b.odds}</span>
+          </div>
+        </div>
+
+        {/* Footer row: time + inline quick action */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+            borderTop: '1px solid var(--fb-border)',
+            paddingTop: 12,
+          }}
+        >
+          <div style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+            {('createdAt' in b && (b as any).createdAt)
+              ? new Date((b as any).createdAt).toLocaleString()
+              : 'Active'}
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            {b.status === 'OPEN' && (
+              <button
+                className="fb-btn fb-btn--primary fb-btn--md"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAccept(b.id);
+                }}
+              >
+                Accept
+              </button>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  // === Keyboard shortcuts (UI only) ===
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          (target as any).isContentEditable);
+      if (isTyping) return;
+
+      const k = e.key.toLowerCase();
+      if (k === 'r') {
+        e.preventDefault();
+        refreshOddsAndGames();
+      } else if (k === 'a') {
+        e.preventDefault();
+        settleAcceptedBets();
+      } else if (k === 's') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (k === 'o') {
+        e.preventDefault();
+        openRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (k === 'k') {
+        e.preventDefault();
+        groupStripRef.current?.focus();
+      } else if (k === 'p') {
+        e.preventDefault();
+        proposeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- main column ----
   const main = (
     <>
       <BetHeader
@@ -510,127 +896,274 @@ export default function BetPage() {
         busyRefresh={busyRefresh}
         busySettle={busySettle}
         rightSlot={
-          <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
-            Selected: <b>{selectedGroupName}</b>
-          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+            <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+              Selected: <b>{selectedGroupName}</b>
+            </span>
+            <span className="fb-meta-row" style={{ gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+                Last refreshed {new Date(lastRefreshed).toLocaleTimeString()}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>•</span>
+              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
+                Shortcuts: <kbd>R</kbd> refresh, <kbd>A</kbd> settle, <kbd>S</kbd> search, <kbd>O</kbd> open, <kbd>K</kbd> groups, <kbd>P</kbd> propose
+              </span>
+            </span>
+          </div>
         }
       />
 
       {/* Select Group strip */}
       <div style={{ marginBottom: 8 }}>
         <SectionCard title="Select Group">
-          <GroupScroller
-            groups={groupChips}
-            onSelect={(id) => setSelectedGroup(id)}
-          />
+          <div
+            ref={groupStripRef}
+            tabIndex={0}
+            aria-label="Group selector"
+            style={{ outline: 'none' }}
+          >
+            <GroupScroller
+              groups={groups.map((g) => ({
+                id: g.id,
+                name: g.name,
+                active: g.id === selectedGroup,
+              })) as GroupChip[]}
+              onSelect={(id) => setSelectedGroup(id)}
+            />
+          </div>
+          <div className="fb-meta-row" style={{ marginTop: 8 }}>
+            <span>Tip: press <kbd>K</kbd> to focus this strip.</span>
+          </div>
         </SectionCard>
       </div>
 
-      {/* Bets list — redesigned as card grid */}
-      <div style={{ marginBottom: 8 }}>
-        <SectionCard title="Open & Accepted Bets">
-          {!selectedGroup ? (
-            <Typography>Select a group to view bets.</Typography>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: 12,
-              }}
+      {/* Sticky filters + search meta bar */}
+      <div
+        className="fb-section-card"
+        style={{
+          position: 'sticky',
+          top: 64,
+          zIndex: 5,
+          padding: 12,
+          border: '1px solid var(--fb-border)',
+          borderRadius: 12,
+          background: 'var(--fb-surface)',
+          display: 'grid',
+          gap: 10,
+          marginBottom: 8,
+        }}
+      >
+        {/* Status tabs */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {(['all','open','accepted','resolved','void'] as BetStatusFilter[]).map(tab => (
+            <button
+              key={tab}
+              className={`fb-btn fb-btn--${statusTab === tab ? 'primary' : 'ghost'} fb-btn--sm`}
+              onClick={() => setStatusTab(tab)}
             >
-              {bets
-                .filter(b => b.status !== 'RESOLVED' && b.status !== 'VOID')
-                .map((b) => {
-                  const tone = statusTone(b.status);
-                  return (
-                    <div
-                      key={b.id}
-                      className="fb-fade"
-                      style={{
-                        border: '1px solid var(--fb-border)',
-                        background: 'var(--fb-surface)',
-                        borderRadius: 16,
-                        padding: 16,
-                        display: 'grid',
-                        gap: 12,
-                      }}
-                    >
-                      {/* Header row */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--fb-text)', fontSize: 18 }}>
-                          {b.gameId}
-                        </div>
-                        <span
-                          className="fb-badge"
-                          style={{
-                            background: tone.bg,
-                            color: tone.text,
-                            borderColor: 'var(--fb-border)',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {b.status}
-                        </span>
-                      </div>
-
-                      {/* Key-Value rows */}
-                      <div className="fb-kv">
-                        <div className="fb-kv__row">
-                          <span className="fb-kv__label">Market:</span>
-                          <span className="fb-kv__value">{b.marketType}</span>
-                        </div>
-                        <div className="fb-kv__row">
-                          <span className="fb-kv__label">Pick:</span>
-                          <span className="fb-kv__value">{formatPick(b)}</span>
-                        </div>
-                        <div className="fb-kv__row">
-                          <span className="fb-kv__label">Amount:</span>
-                          <span className="fb-kv__value">${(b.amountCents / 100).toFixed(2)}</span>
-                        </div>
-                        <div className="fb-kv__row">
-                          <span className="fb-kv__label">Odds:</span>
-                          <span className="fb-kv__value">{b.odds}</span>
-                        </div>
-                      </div>
-
-                      {/* Footer row: time + action */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: 8,
-                          alignItems: 'center',
-                          borderTop: '1px solid var(--fb-border)',
-                          paddingTop: 12,
-                        }}
-                      >
-                        <div style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
-                          {/* We don’t have a kickoff on the bet object—show created time as a proxy if present */}
-                          {('createdAt' in b && (b as any).createdAt)
-                            ? new Date((b as any).createdAt).toLocaleString()
-                            : 'Active'}
-                        </div>
-                        <div style={{ marginLeft: 'auto' }}>
-                          {b.status === 'OPEN' && (
-                            <button
-                              className="fb-btn fb-btn--primary fb-btn--md"
-                              onClick={() => onAccept(b.id)}
-                            >
-                              Accept
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </SectionCard>
+              {tab[0].toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <TextField
+              inputRef={searchRef}
+              label="Search bets…"
+              size="small"
+              value={betSearch}
+              onChange={(e) => setBetSearch(e.target.value)}
+              style={{ minWidth: 260 }}
+              placeholder="game / market / status / pick"
+            />
+            <span className="fb-badge">Total: {bets.length}</span>
+            <span className="fb-badge">Open: {openAll.length}</span>
+            <span className="fb-badge">Accepted: {acceptedAll.length}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Propose bet (unchanged logic; lightly cleaned grid) */}
-      <SectionCard title="Propose a Bet">
+      {/* Section A: Proposed (OPEN) */}
+      {(statusTab === 'all' || statusTab === 'open') && (
+        <div style={{ marginBottom: 8 }} ref={openRef}>
+          <SectionCard title={`Proposed Bets (Open) — ${openBets.length}`}>
+            {!selectedGroup ? (
+              <Typography>Select a group to view bets.</Typography>
+            ) : loadingBets ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            ) : openBets.length === 0 ? (
+              <EmptyState
+                title="No open proposals"
+                text={betSearch || statusTab !== 'all' ? 'No open bets match your view.' : 'When someone proposes a bet, it shows up here.'}
+              />
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {openBets.map((b) => BetCard(b))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* Section B: Accepted */}
+      {(statusTab === 'all' || statusTab === 'accepted') && (
+        <div style={{ marginBottom: 8 }}>
+          <SectionCard title={`Accepted Bets — ${acceptedBets.length}`}>
+            {!selectedGroup ? (
+              <Typography>Select a group to view bets.</Typography>
+            ) : loadingBets ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            ) : acceptedBets.length === 0 ? (
+              <EmptyState
+                title="No accepted bets"
+                text={betSearch || statusTab !== 'all' ? 'No accepted bets match your view.' : 'Accept a proposal to see it here.'}
+              />
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {acceptedBets.map((b) => BetCard(b))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* Optional: show resolved/void when tabs are selected */}
+      {statusTab === 'resolved' && (
+        <div style={{ marginBottom: 8 }}>
+          <SectionCard title={`Resolved Bets — ${resolvedBets.length}`}>
+            {loadingBets ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                <SkeletonCard />
+              </div>
+            ) : resolvedBets.length === 0 ? (
+              <EmptyState title="No resolved bets" text="Nothing to show yet." />
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {resolvedBets.map((b) => BetCard(b))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {statusTab === 'void' && (
+        <div style={{ marginBottom: 8 }}>
+          <SectionCard title={`Void Bets — ${voidBets.length}`}>
+            {loadingBets ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                <SkeletonCard />
+              </div>
+            ) : voidBets.length === 0 ? (
+              <EmptyState title="No void bets" text="Nothing to show yet." />
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {voidBets.map((b) => BetCard(b))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* Propose section header strip */}
+      <div
+        className="fb-section-card"
+        style={{ padding: 12, border: '1px solid var(--fb-border)', borderRadius: 12, marginBottom: 8 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Typography variant="h6" sx={{ margin: 0, fontWeight: 700, color: 'var(--fb-text)' }}>
+            Propose New Bet
+          </Typography>
+          <div style={{ marginLeft: 'auto' }}>
+            <button
+              className="fb-btn fb-btn--primary fb-btn--md"
+              onClick={() => proposeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
+              + Propose Bet
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Propose bet */}
+      <SectionCard title={`Propose Bet to ${selectedGroupName}`}>
+        <div ref={proposeRef} />
+
+        {/* Game peek card */}
+        {selectedGame && (
+          <div
+            className="fb-fade"
+            style={{
+              border: '1px solid var(--fb-border)',
+              background: 'var(--fb-surface)',
+              borderRadius: 12,
+              padding: 10,
+              marginBottom: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontWeight: 700, color: 'var(--fb-text)' }}>
+              {selectedGame.homeTeam} vs {selectedGame.awayTeam}
+            </div>
+            <div className="fb-badge" style={{ marginLeft: 'auto' }}>
+              {new Date(selectedGame.startTime).toLocaleString()}
+            </div>
+          </div>
+        )}
+
         {sportsError && (
           <Typography color="error" sx={{ mb: 1 }}>
             {sportsError}
@@ -657,7 +1190,7 @@ export default function BetPage() {
             }}
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
               gap: 12,
               alignItems: 'start',
             }}
@@ -666,15 +1199,15 @@ export default function BetPage() {
               label="Your User ID"
               value={userId}
               InputProps={{ readOnly: true }}
-              helperText={userId ? undefined : 'Sign in again if this is empty'}
+              helperText={userId ? 'Signed in' : 'Sign in again if empty'}
               required
             />
 
             <FormControl>
-              <InputLabel id="market-label">Market</InputLabel>
+              <InputLabel id="market-label">Market Type</InputLabel>
               <Select
                 labelId="market-label"
-                label="Market"
+                label="Market Type"
                 value={marketType}
                 onChange={e => handleMarketChange(e.target.value as MarketType)}
               >
@@ -686,29 +1219,82 @@ export default function BetPage() {
                 <MenuItem value="SAME_GAME">Same Game (SGP)</MenuItem>
                 <MenuItem value="PARLAY">Parlay</MenuItem>
               </Select>
+              <FormHelperText>Select a market for this bet</FormHelperText>
             </FormControl>
 
-            {/* Market-specific inputs */}
+            {/* Show pickers for the markets that are game-first */}
+            {marketType !== 'PLAYER_PROP' && marketType !== 'TEAM_PROP' && marketType !== 'PARLAY' && (
+              <SportGamePickers />
+            )}
+
             {(() => {
               const commonEnd = (
                 <>
-                  <TextField
-                    label="Odds (decimal)"
-                    type="number"
-                    value={odds}
-                    onChange={e => setOdds(+e.target.value)}
-                    inputProps={{ step: '0.01', min: 1.01 }}
-                    required
-                  />
-                  <TextField
-                    label="Amount (cents)"
-                    type="text"
-                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                    value={amountCents}
-                    onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))}
-                    placeholder="e.g. 500"
-                    required
-                  />
+                  {/* Odds with quick presets */}
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <TextField
+                      label="Odds (decimal)"
+                      type="number"
+                      value={odds}
+                      onChange={e => setOdds(+e.target.value)}
+                      inputProps={{ step: '0.01', min: 1.01 }}
+                      required
+                      placeholder="e.g., 1.85"
+                      error={!!formError && formError.includes('Odds')}
+                      helperText={!!formError && formError.includes('Odds') ? formError : 'Decimal odds > 1.0'}
+                    />
+                    <div className="fb-actions" role="group" aria-label="Quick odds">
+                      {ODDS_PRESETS.map(o => (
+                        <button
+                          key={o}
+                          type="button"
+                          className="fb-btn fb-btn--ghost fb-btn--sm"
+                          onClick={() => setOdds(o)}
+                        >
+                          {o.toFixed(2)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Amount with quick presets */}
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <TextField
+                      label="Amount (cents)"
+                      type="text"
+                      inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                      value={amountCents}
+                      onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))}
+                      placeholder="e.g., 2500"
+                      required
+                      error={!!formError && (formError.includes('Amount'))}
+                      helperText={!!formError && (formError.includes('Amount')) ? formError : 'Enter stake in cents, e.g., 2500 = $25'}
+                    />
+                    <div className="fb-actions" role="group" aria-label="Quick amounts">
+                      {AMOUNT_PRESETS.map(cents => (
+                        <button
+                          key={cents}
+                          type="button"
+                          className="fb-btn fb-btn--ghost fb-btn--sm"
+                          onClick={() => setAmountCents(String(cents))}
+                          title={`Set ${cents / 100} dollars`}
+                        >
+                          ${(cents / 100).toFixed(0)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live math preview */}
+                  <div
+                    className="fb-badge"
+                    style={{ gridColumn: '1 / -1', width: 'fit-content', background: '#fff' }}
+                    aria-live="polite"
+                  >
+                    Stake: <b>${stake.toFixed(2)}</b> •
+                    &nbsp;Potential win: <b>${potentialWin.toFixed(2)}</b> •
+                    &nbsp;Payout: <b>${potentialPayout.toFixed(2)}</b>
+                  </div>
                 </>
               );
 
@@ -716,8 +1302,15 @@ export default function BetPage() {
                 case 'WINNER':
                   return (
                     <>
-                      <SportGamePickers />
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="Auto-set when you choose a game"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : 'Ensure this matches the selected game'}
+                      />
                       <FormControl>
                         <InputLabel id="pick-label">Pick</InputLabel>
                         <Select
@@ -729,6 +1322,7 @@ export default function BetPage() {
                           <MenuItem value="HOME">HOME</MenuItem>
                           <MenuItem value="AWAY">AWAY</MenuItem>
                         </Select>
+                        <FormHelperText>Choose HOME or AWAY</FormHelperText>
                       </FormControl>
                       {commonEnd}
                     </>
@@ -736,8 +1330,15 @@ export default function BetPage() {
                 case 'SPREAD':
                   return (
                     <>
-                      <SportGamePickers />
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="Auto-set when you choose a game"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : undefined}
+                      />
                       <FormControl>
                         <InputLabel id="spread-team">Team</InputLabel>
                         <Select
@@ -749,14 +1350,17 @@ export default function BetPage() {
                           <MenuItem value="HOME">HOME</MenuItem>
                           <MenuItem value="AWAY">AWAY</MenuItem>
                         </Select>
+                        <FormHelperText>Which side of the spread?</FormHelperText>
                       </FormControl>
                       <TextField
-                        label="Spread Points (e.g., -3.5)"
+                        label="Spread Points"
                         value={spreadPoints}
                         onChange={e => setSpreadPoints(e.target.value)}
                         placeholder="-3.5"
                         inputProps={{ inputMode: 'decimal' }}
                         required
+                        error={!!formError && formError.includes('spread')}
+                        helperText={!!formError && formError.includes('spread') ? formError : 'Use negative for favorites, positive for underdogs'}
                       />
                       {commonEnd}
                     </>
@@ -764,14 +1368,24 @@ export default function BetPage() {
                 case 'TOTALS':
                   return (
                     <>
-                      <SportGamePickers />
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
                       <TextField
-                        label="Totals Line (e.g., 210.5)"
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="Auto-set when you choose a game"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : undefined}
+                      />
+                      <TextField
+                        label="Totals Line"
                         value={totalsLine}
                         onChange={e => setTotalsLine(e.target.value)}
                         inputProps={{ inputMode: 'decimal' }}
+                        placeholder="e.g., 210.5"
                         required
+                        error={!!formError && formError.includes('Totals line')}
+                        helperText={!!formError && formError.includes('Totals line') ? formError : 'Enter a number like 210.5'}
                       />
                       <FormControl>
                         <InputLabel id="totals-dir">Direction</InputLabel>
@@ -784,6 +1398,7 @@ export default function BetPage() {
                           <MenuItem value="OVER">OVER</MenuItem>
                           <MenuItem value="UNDER">UNDER</MenuItem>
                         </Select>
+                        <FormHelperText>Over or Under the line</FormHelperText>
                       </FormControl>
                       {commonEnd}
                     </>
@@ -791,8 +1406,23 @@ export default function BetPage() {
                 case 'PLAYER_PROP':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
-                      <TextField label="Player Name" value={ppPlayerName} onChange={e => setPpPlayerName(e.target.value)} required />
+                      <TextField
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="Use a game where the player appears"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : undefined}
+                      />
+                      <TextField
+                        label="Player Name"
+                        value={ppPlayerName}
+                        onChange={e => setPpPlayerName(e.target.value)}
+                        required
+                        error={!!formError && formError.includes('Player name')}
+                        helperText={!!formError && formError.includes('Player name') ? formError : undefined}
+                      />
                       <FormControl>
                         <InputLabel id="pp-stat">Stat</InputLabel>
                         <Select
@@ -808,13 +1438,17 @@ export default function BetPage() {
                           <MenuItem value="SAVES">SAVES</MenuItem>
                           <MenuItem value="CUSTOM">CUSTOM</MenuItem>
                         </Select>
+                        <FormHelperText>Choose the statistic</FormHelperText>
                       </FormControl>
                       <TextField
-                        label="Line (e.g., 22.5)"
+                        label="Line"
                         value={ppLine}
                         onChange={e => setPpLine(e.target.value)}
                         inputProps={{ inputMode: 'decimal' }}
+                        placeholder="e.g., 22.5"
                         required
+                        error={!!formError && formError.includes('Player prop line')}
+                        helperText={!!formError && formError.includes('Player prop line') ? formError : undefined}
                       />
                       <FormControl>
                         <InputLabel id="pp-dir">Direction</InputLabel>
@@ -827,6 +1461,7 @@ export default function BetPage() {
                           <MenuItem value="OVER">OVER</MenuItem>
                           <MenuItem value="UNDER">UNDER</MenuItem>
                         </Select>
+                        <FormHelperText>Over/Under on the player line</FormHelperText>
                       </FormControl>
                       {commonEnd}
                     </>
@@ -834,7 +1469,15 @@ export default function BetPage() {
                 case 'TEAM_PROP':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="Auto-set when you choose a game"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : undefined}
+                      />
                       <FormControl>
                         <InputLabel id="tp-team">Team</InputLabel>
                         <Select
@@ -846,9 +1489,27 @@ export default function BetPage() {
                           <MenuItem value="HOME">HOME</MenuItem>
                           <MenuItem value="AWAY">AWAY</MenuItem>
                         </Select>
+                        <FormHelperText>Which team the prop applies to</FormHelperText>
                       </FormControl>
-                      <TextField label="Prop Type (e.g., TOTAL_POINTS)" value={tpPropType} onChange={e => setTpPropType(e.target.value)} required />
-                      <TextField label="Line (e.g., 100.5)" value={tpLine} onChange={e => setTpLine(e.target.value)} inputProps={{ inputMode: 'decimal' }} required />
+                      <TextField
+                        label="Prop Type"
+                        value={tpPropType}
+                        onChange={e => setTpPropType(e.target.value)}
+                        placeholder="e.g., TOTAL_POINTS"
+                        required
+                        error={!!formError && formError.includes('Team prop type')}
+                        helperText={!!formError && formError.includes('Team prop type') ? formError : undefined}
+                      />
+                      <TextField
+                        label="Line"
+                        value={tpLine}
+                        onChange={e => setTpLine(e.target.value)}
+                        inputProps={{ inputMode: 'decimal' }}
+                        placeholder="e.g., 100.5"
+                        required
+                        error={!!formError && formError.includes('Team prop line')}
+                        helperText={!!formError && formError.includes('Team prop line') ? formError : undefined}
+                      />
                       <FormControl>
                         <InputLabel id="tp-dir">Direction</InputLabel>
                         <Select
@@ -860,6 +1521,7 @@ export default function BetPage() {
                           <MenuItem value="OVER">OVER</MenuItem>
                           <MenuItem value="UNDER">UNDER</MenuItem>
                         </Select>
+                        <FormHelperText>Over/Under on the team line</FormHelperText>
                       </FormControl>
                       {commonEnd}
                     </>
@@ -867,7 +1529,15 @@ export default function BetPage() {
                 case 'SAME_GAME':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="The game your SGP applies to"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : undefined}
+                      />
                       <TextField
                         label="Legs (one per line)"
                         value={sgpLegs}
@@ -876,6 +1546,8 @@ export default function BetPage() {
                         minRows={3}
                         placeholder={`Example:\nHOME -3.5\nPLAYER X OVER 22.5 PTS`}
                         required
+                        error={!!formError && formError.includes('SGP leg')}
+                        helperText={!!formError && formError.includes('SGP leg') ? formError : 'Enter at least one leg'}
                       />
                       {commonEnd}
                     </>
@@ -883,7 +1555,15 @@ export default function BetPage() {
                 case 'PARLAY':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required />
+                      <TextField
+                        label="Game ID"
+                        value={gameId}
+                        onChange={e => setGameId(e.target.value)}
+                        required
+                        placeholder="Any related game ID (admin note)"
+                        error={!!formError && formError.includes('Game ID')}
+                        helperText={!!formError && formError.includes('Game ID') ? formError : undefined}
+                      />
                       <TextField
                         label="Legs (one per line)"
                         value={parlayLegs}
@@ -892,6 +1572,8 @@ export default function BetPage() {
                         minRows={3}
                         placeholder={`Example:\nGAME_A HOME ML\nGAME_B OVER 210.5`}
                         required
+                        error={!!formError && formError.includes('Parlay')}
+                        helperText={!!formError && formError.includes('Parlay') ? formError : 'Enter at least one leg'}
                       />
                       {commonEnd}
                     </>
@@ -901,19 +1583,126 @@ export default function BetPage() {
               }
             })()}
 
-            <div style={{ gridColumn: '1 / -1' }}>
-              <MUIButton type="submit" variant="contained">
+            {/* Full-width submit row */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8 }}>
+              <MUIButton type="submit" variant="contained" disabled={submitDisabled}>
                 Propose Bet
               </MUIButton>
+              <MUIButton
+                type="button"
+                variant="outlined"
+                onClick={() => {
+                  // keep market/game selection; clear stake + quick fields
+                  setAmountCents('');
+                  setOdds(1.8);
+                  resetMarketSpecificFields();
+                }}
+              >
+                Clear
+              </MUIButton>
+              {submitDisabled && formError && (
+                <div className="fb-badge" style={{ marginLeft: 8, alignSelf: 'center' }}>
+                  {formError}
+                </div>
+              )}
             </div>
           </form>
         )}
       </SectionCard>
+
+      <ToastContainer items={toasts} onClose={closeToast} />
     </>
   );
 
+  // ---- right rail: bet details panel ----
   const right = (
-    <RightRail>{/* future tips/cards */}</RightRail>
+    <RightRail>
+      <SectionCard title="Bet Details">
+        {!selectedBet ? (
+          <div style={{ color: 'var(--fb-muted)' }}>
+            Select a bet card to view its details.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ fontWeight: 700, color: 'var(--fb-text)' }}>
+              {selectedBet.gameId}
+            </div>
+
+            <div className="fb-kv">
+              <div className="fb-kv__row">
+                <span className="fb-kv__label">Status</span>
+                <span className="fb-kv__value">{selectedBet.status}</span>
+              </div>
+              <div className="fb-kv__row">
+                <span className="fb-kv__label">Market</span>
+                <span className="fb-kv__value">{selectedBet.marketType}</span>
+              </div>
+              <div className="fb-kv__row">
+                <span className="fb-kv__label">Pick</span>
+                <span className="fb-kv__value">{formatPick(selectedBet)}</span>
+              </div>
+              <div className="fb-kv__row">
+                <span className="fb-kv__label">Odds</span>
+                <span className="fb-kv__value">{selectedBet.odds}</span>
+              </div>
+              <div className="fb-kv__row">
+                <span className="fb-kv__label">Amount</span>
+                <span className="fb-kv__value">${(selectedBet.amountCents / 100).toFixed(2)}</span>
+              </div>
+              {'createdAt' in selectedBet && (selectedBet as any).createdAt && (
+                <div className="fb-kv__row">
+                  <span className="fb-kv__label">Created</span>
+                  <span className="fb-kv__value">
+                    {new Date((selectedBet as any).createdAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Market-specific detail peek */}
+            {selectedBet.marketType === 'SPREAD' && typeof (selectedBet as any).details?.spreadPoints === 'number' && (
+              <div className="fb-badge" style={{ width: 'fit-content' }}>
+                Spread: {(selectedBet as any).details.spreadPoints}
+              </div>
+            )}
+            {selectedBet.marketType === 'TOTALS' && typeof (selectedBet as any).details?.totalLine === 'number' && (
+              <div className="fb-badge" style={{ width: 'fit-content' }}>
+                Total line: {(selectedBet as any).details.totalLine}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <button
+                className="fb-btn fb-btn--ghost fb-btn--md"
+                onClick={() => {
+                  navigator.clipboard?.writeText(selectedBet.id).catch(() => {});
+                  pushToast('Bet ID copied', 'info');
+                }}
+              >
+                Copy Bet ID
+              </button>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                {selectedBet.status === 'OPEN' && (
+                  <button
+                    className="fb-btn fb-btn--primary fb-btn--md"
+                    onClick={() => onAccept(selectedBet.id)}
+                  >
+                    Accept Bet
+                  </button>
+                )}
+                <button
+                  className="fb-btn fb-btn--ghost fb-btn--md"
+                  onClick={() => setSelectedBetId(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </SectionCard>
+    </RightRail>
   );
 
   return <TwoColumn main={main} right={right} />;
