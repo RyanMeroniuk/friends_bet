@@ -1,20 +1,8 @@
-// NOTE: This file is identical to your current Step 10 file
-// EXCEPT for the two buttons in the submit row (near the bottom).
-// They now use the rounded black/white style to match the rest of the app.
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { listMyGroups, GroupResponse } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import { listGames, GameSummary } from '../api/game';
-import {
-  Typography,
-  TextField,
-  MenuItem,
-  Select,
-  InputLabel,
-  FormControl,
-  FormHelperText,
-} from '@mui/material';
+import { Typography } from '@mui/material';
 
 import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi } from '../api/bet';
 import { useAuth } from '../context/AuthContext';
@@ -26,6 +14,9 @@ import EmptyState from '../components/EmptyState';
 import GroupScroller, { GroupChip } from '../components/GroupScroller';
 import BetHeader from '../components/BetHeader';
 import { ToastContainer, ToastItem } from '../components/Toast';
+import FormField from '../components/FormField';
+import Input from '../components/Input';
+import Select from '../components/Select';
 
 type MarketType =
   | 'WINNER'
@@ -373,39 +364,48 @@ export default function BetPage() {
 
     return (
       <>
-        <FormControl>
-          <InputLabel id="sport-picker">Sport</InputLabel>
+        <FormField label="Sport" htmlFor="bet-sport" helperText={sportHelper} required>
           <Select
-            labelId="sport-picker" label="Sport"
-            value={selectedSport} onChange={e => setSelectedSport(String(e.target.value))}
-            displayEmpty disabled={sportsLoading}
+            id="bet-sport"
+            value={selectedSport}
+            onChange={e => setSelectedSport(e.target.value)}
+            disabled={sportsLoading}
           >
-            {sportsLoading && <MenuItem value=""><em>Loading…</em></MenuItem>}
-            {!sportsLoading && sports.length === 0 && <MenuItem value=""><em>No sports</em></MenuItem>}
-            {!sportsLoading && sports.map(s => (<MenuItem key={s} value={s}>{s}</MenuItem>))}
-          </Select>
-          <FormHelperText>{sportHelper}</FormHelperText>
-        </FormControl>
-
-        <FormControl>
-          <InputLabel id="game-picker">Pick Game</InputLabel>
-          <Select
-            labelId="game-picker" label="Pick Game"
-            value={gameId} onChange={e => handlePickGame(String(e.target.value))}
-            displayEmpty disabled={gamesLoading || !selectedSport}
-          >
-            {gamesLoading && <MenuItem value=""><em>Loading…</em></MenuItem>}
-            {!gamesLoading && games.length === 0 && <MenuItem value=""><em>No games</em></MenuItem>}
-            {!gamesLoading && games.map(g => (
-              <MenuItem key={g.id} value={g.id}>
-                {g.homeTeam} vs {g.awayTeam} — {new Date(g.startTime).toLocaleString()}
-              </MenuItem>
+            <option value="">
+              {sportsLoading
+                ? 'Loading…'
+                : (sports.length ? 'Select a sport' : 'No sports available')}
+            </option>
+            {sports.map(s => (
+              <option key={s} value={s}>{s}</option>
             ))}
           </Select>
-          <FormHelperText>
-            {gamesLoading ? 'Loading games…' : (selectedSport ? `${games.length} game${games.length === 1 ? '' : 's'}` : 'Select a sport to show games')}
-          </FormHelperText>
-        </FormControl>
+        </FormField>
+
+        <FormField
+          label="Pick Game"
+          htmlFor="bet-game"
+          helperText={gamesLoading ? 'Loading games…' : (selectedSport ? `${games.length} game${games.length === 1 ? '' : 's'}` : 'Select a sport to show games')}
+          required
+        >
+          <Select
+            id="bet-game"
+            value={gameId}
+            onChange={e => handlePickGame(e.target.value)}
+            disabled={gamesLoading || !selectedSport}
+          >
+            <option value="">
+              {gamesLoading
+                ? 'Loading…'
+                : (games.length ? 'Choose a game' : 'No games available')}
+            </option>
+            {games.map(g => (
+              <option key={g.id} value={g.id}>
+                {g.homeTeam} vs {g.awayTeam} — {new Date(g.startTime).toLocaleString()}
+              </option>
+            ))}
+          </Select>
+        </FormField>
       </>
     );
   }
@@ -573,7 +573,15 @@ export default function BetPage() {
             </button>
           ))}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <TextField inputRef={searchRef} label="Search bets…" size="small" value={betSearch} onChange={(e) => setBetSearch(e.target.value)} style={{ minWidth: 260 }} placeholder="game / market / status / pick" />
+            <Input
+              id="bet-search"
+              ref={searchRef}
+              value={betSearch}
+              onChange={e => setBetSearch(e.target.value)}
+              placeholder="Search bets…"
+              aria-label="Search bets"
+              style={{ minWidth: 260 }}
+            />
             <span className="fb-badge">Total: {bets.length}</span>
             <span className="fb-badge">Open: {openAll.length}</span>
             <span className="fb-badge">Accepted: {acceptedAll.length}</span>
@@ -683,48 +691,109 @@ export default function BetPage() {
         ) : (
           <form
             onSubmit={e => { e.preventDefault(); onPropose(); }}
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, alignItems: 'start' }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: 20,
+              columnGap: 28,
+              alignItems: 'start',
+              padding: '4px 8px 12px',
+            }}
           >
-            <TextField label="Your User ID" value={userId} InputProps={{ readOnly: true }} helperText={userId ? 'Signed in' : 'Sign in again if empty'} required />
+            <FormField
+              label="Your User ID"
+              htmlFor="bet-user-id"
+              helperText={userId ? 'Signed in' : 'Sign in again if empty'}
+              required
+            >
+              <Input id="bet-user-id" value={userId} readOnly required />
+            </FormField>
 
-            <FormControl>
-              <InputLabel id="market-label">Market Type</InputLabel>
-              <Select labelId="market-label" label="Market Type" value={marketType} onChange={e => handleMarketChange(e.target.value as MarketType)}>
-                <MenuItem value="WINNER">Moneyline (WINNER)</MenuItem>
-                <MenuItem value="SPREAD">Spread</MenuItem>
-                <MenuItem value="TOTALS">Totals (O/U)</MenuItem>
-                <MenuItem value="PLAYER_PROP">Player Prop</MenuItem>
-                <MenuItem value="TEAM_PROP">Team Prop</MenuItem>
-                <MenuItem value="SAME_GAME">Same Game (SGP)</MenuItem>
-                <MenuItem value="PARLAY">Parlay</MenuItem>
+            <FormField
+              label="Market Type"
+              htmlFor="bet-market-type"
+              helperText="Select a market for this bet"
+              required
+            >
+              <Select
+                id="bet-market-type"
+                value={marketType}
+                onChange={e => handleMarketChange(e.target.value as MarketType)}
+              >
+                <option value="WINNER">Moneyline (WINNER)</option>
+                <option value="SPREAD">Spread</option>
+                <option value="TOTALS">Totals (O/U)</option>
+                <option value="PLAYER_PROP">Player Prop</option>
+                <option value="TEAM_PROP">Team Prop</option>
+                <option value="SAME_GAME">Same Game (SGP)</option>
+                <option value="PARLAY">Parlay</option>
               </Select>
-              <FormHelperText>Select a market for this bet</FormHelperText>
-            </FormControl>
+            </FormField>
 
             {marketType !== 'PLAYER_PROP' && marketType !== 'TEAM_PROP' && marketType !== 'PARLAY' && (<SportGamePickers />)}
 
             {(() => {
               const commonEnd = (
                 <>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    <TextField label="Odds (decimal)" type="number" value={odds} onChange={e => setOdds(+e.target.value)} inputProps={{ step: '0.01', min: 1.01 }} required placeholder="e.g., 1.85" />
-                    <div className="fb-actions" role="group" aria-label="Quick odds">
-                      {ODDS_PRESETS.map(o => (
-                        <button key={o} type="button" className="fb-btn fb-btn--ghost fb-btn--sm" onClick={() => setOdds(o)}>{o.toFixed(2)}</button>
-                      ))}
+                  <FormField
+                    label="Odds (decimal)"
+                    htmlFor="bet-odds"
+                    helperText="Quick presets below"
+                    required
+                  >
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <Input
+                        id="bet-odds"
+                        type="number"
+                        step="0.01"
+                        min="1.01"
+                        value={Number.isNaN(odds) ? '' : odds}
+                        onChange={e => setOdds(e.target.value === '' ? NaN : Number(e.target.value))}
+                        placeholder="e.g., 1.85"
+                        required
+                      />
+                      <div className="fb-actions" role="group" aria-label="Quick odds">
+                        {ODDS_PRESETS.map(o => (
+                          <button key={o} type="button" className="fb-btn fb-btn--ghost fb-btn--sm" onClick={() => setOdds(o)}>
+                            {o.toFixed(2)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  </FormField>
 
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    <TextField label="Amount (cents)" type="text" inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }} value={amountCents} onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))} placeholder="e.g., 2500" required />
-                    <div className="fb-actions" role="group" aria-label="Quick amounts">
-                      {AMOUNT_PRESETS.map(cents => (
-                        <button key={cents} type="button" className="fb-btn fb-btn--ghost fb-btn--sm" onClick={() => setAmountCents(String(cents))} title={`Set ${cents / 100} dollars`}>
-                          ${(cents / 100).toFixed(0)}
-                        </button>
-                      ))}
+                  <FormField
+                    label="Amount (cents)"
+                    htmlFor="bet-amount"
+                    helperText="Set stake in cents"
+                    required
+                  >
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <Input
+                        id="bet-amount"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={amountCents}
+                        onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))}
+                        placeholder="e.g., 2500"
+                        required
+                      />
+                      <div className="fb-actions" role="group" aria-label="Quick amounts">
+                        {AMOUNT_PRESETS.map(cents => (
+                          <button
+                            key={cents}
+                            type="button"
+                            className="fb-btn fb-btn--ghost fb-btn--sm"
+                            onClick={() => setAmountCents(String(cents))}
+                            title={`Set ${(cents / 100).toFixed(0)} dollars`}
+                          >
+                            {(cents / 100).toFixed(0)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  </FormField>
 
                   <div className="fb-badge" style={{ gridColumn: '1 / -1', width: 'fit-content', background: '#fff' }} aria-live="polite">
                     Stake: <b>${stake.toFixed(2)}</b> • &nbsp;Potential win: <b>${potentialWin.toFixed(2)}</b> • &nbsp;Payout: <b>${potentialPayout.toFixed(2)}</b>
@@ -736,108 +805,197 @@ export default function BetPage() {
                 case 'WINNER':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="Auto-set when you choose a game" />
-                      <FormControl>
-                        <InputLabel id="pick-label">Pick</InputLabel>
-                        <Select labelId="pick-label" label="Pick" value={pick} onChange={e => setPick(String(e.target.value))}>
-                          <MenuItem value="HOME">HOME</MenuItem><MenuItem value="AWAY">AWAY</MenuItem>
+                      <FormField label="Game ID" htmlFor="bet-game-id" helperText="Auto-set when you choose a game" required>
+                        <Input id="bet-game-id" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
+                      </FormField>
+                      <FormField label="Pick" htmlFor="bet-winner-pick" helperText="Choose HOME or AWAY" required>
+                        <Select id="bet-winner-pick" value={pick} onChange={e => setPick(e.target.value)}>
+                          <option value="HOME">HOME</option>
+                          <option value="AWAY">AWAY</option>
                         </Select>
-                        <FormHelperText>Choose HOME or AWAY</FormHelperText>
-                      </FormControl>
+                      </FormField>
                       {commonEnd}
                     </>
                   );
                 case 'SPREAD':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="Auto-set when you choose a game" />
-                      <FormControl>
-                        <InputLabel id="spread-team">Team</InputLabel>
-                        <Select labelId="spread-team" label="Team" value={pick} onChange={e => setPick(String(e.target.value))}>
-                          <MenuItem value="HOME">HOME</MenuItem><MenuItem value="AWAY">AWAY</MenuItem>
+                      <FormField label="Game ID" htmlFor="bet-spread-game" helperText="Auto-set when you choose a game" required>
+                        <Input id="bet-spread-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
+                      </FormField>
+                      <FormField label="Team" htmlFor="bet-spread-team" helperText="Which side of the spread?" required>
+                        <Select id="bet-spread-team" value={pick} onChange={e => setPick(e.target.value)}>
+                          <option value="HOME">HOME</option>
+                          <option value="AWAY">AWAY</option>
                         </Select>
-                        <FormHelperText>Which side of the spread?</FormHelperText>
-                      </FormControl>
-                      <TextField label="Spread Points" value={spreadPoints} onChange={e => setSpreadPoints(e.target.value)} placeholder="-3.5" inputProps={{ inputMode: 'decimal' }} required />
+                      </FormField>
+                      <FormField label="Spread Points" htmlFor="bet-spread-points" helperText="Enter spread like -3.5" required>
+                        <Input
+                          id="bet-spread-points"
+                          value={spreadPoints}
+                          onChange={e => setSpreadPoints(e.target.value)}
+                          inputMode="decimal"
+                          placeholder="-3.5"
+                          required
+                        />
+                      </FormField>
                       {commonEnd}
                     </>
                   );
                 case 'TOTALS':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="Auto-set when you choose a game" />
-                      <TextField label="Totals Line" value={totalsLine} onChange={e => setTotalsLine(e.target.value)} inputProps={{ inputMode: 'decimal' }} placeholder="e.g., 210.5" required />
-                      <FormControl>
-                        <InputLabel id="totals-dir">Direction</InputLabel>
-                        <Select labelId="totals-dir" label="Direction" value={totalsDirection} onChange={e => setTotalsDirection(e.target.value as 'OVER' | 'UNDER')}>
-                          <MenuItem value="OVER">OVER</MenuItem><MenuItem value="UNDER">UNDER</MenuItem>
+                      <FormField label="Game ID" htmlFor="bet-totals-game" helperText="Auto-set when you choose a game" required>
+                        <Input id="bet-totals-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
+                      </FormField>
+                      <FormField label="Totals Line" htmlFor="bet-totals-line" helperText="Decimal line (e.g., 210.5)" required>
+                        <Input
+                          id="bet-totals-line"
+                          value={totalsLine}
+                          onChange={e => setTotalsLine(e.target.value)}
+                          inputMode="decimal"
+                          placeholder="e.g., 210.5"
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Direction" htmlFor="bet-totals-direction" helperText="Over or Under the line" required>
+                        <Select
+                          id="bet-totals-direction"
+                          value={totalsDirection}
+                          onChange={e => setTotalsDirection(e.target.value as 'OVER' | 'UNDER')}
+                        >
+                          <option value="OVER">OVER</option>
+                          <option value="UNDER">UNDER</option>
                         </Select>
-                        <FormHelperText>Over or Under the line</FormHelperText>
-                      </FormControl>
+                      </FormField>
                       {commonEnd}
                     </>
                   );
                 case 'PLAYER_PROP':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="Use a game where the player appears" />
-                      <TextField label="Player Name" value={ppPlayerName} onChange={e => setPpPlayerName(e.target.value)} required />
-                      <FormControl>
-                        <InputLabel id="pp-stat">Stat</InputLabel>
-                        <Select labelId="pp-stat" label="Stat" value={ppStatType} onChange={e => setPpStatType(e.target.value as any)}>
-                          <MenuItem value="POINTS">POINTS</MenuItem><MenuItem value="REBOUNDS">REBOUNDS</MenuItem>
-                          <MenuItem value="ASSISTS">ASSISTS</MenuItem><MenuItem value="GOALS">GOALS</MenuItem>
-                          <MenuItem value="SAVES">SAVES</MenuItem><MenuItem value="CUSTOM">CUSTOM</MenuItem>
+                      <FormField label="Game ID" htmlFor="bet-pp-game" helperText="Use a game where the player appears" required>
+                        <Input id="bet-pp-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Use a game where the player appears" required />
+                      </FormField>
+                      <FormField label="Player Name" htmlFor="bet-pp-player" required>
+                        <Input id="bet-pp-player" value={ppPlayerName} onChange={e => setPpPlayerName(e.target.value)} placeholder="Player name" required />
+                      </FormField>
+                      <FormField label="Stat" htmlFor="bet-pp-stat" helperText="Choose the statistic" required>
+                        <Select
+                          id="bet-pp-stat"
+                          value={ppStatType}
+                          onChange={e => setPpStatType(e.target.value as typeof ppStatType)}
+                        >
+                          <option value="POINTS">POINTS</option>
+                          <option value="REBOUNDS">REBOUNDS</option>
+                          <option value="ASSISTS">ASSISTS</option>
+                          <option value="GOALS">GOALS</option>
+                          <option value="SAVES">SAVES</option>
+                          <option value="CUSTOM">CUSTOM</option>
                         </Select>
-                        <FormHelperText>Choose the statistic</FormHelperText>
-                      </FormControl>
-                      <TextField label="Line" value={ppLine} onChange={e => setPpLine(e.target.value)} inputProps={{ inputMode: 'decimal' }} placeholder="e.g., 22.5" required />
-                      <FormControl>
-                        <InputLabel id="pp-dir">Direction</InputLabel>
-                        <Select labelId="pp-dir" label="Direction" value={ppDirection} onChange={e => setPpDirection(e.target.value as any)}>
-                          <MenuItem value="OVER">OVER</MenuItem><MenuItem value="UNDER">UNDER</MenuItem>
+                      </FormField>
+                      <FormField label="Line" htmlFor="bet-pp-line" helperText="Value for the prop" required>
+                        <Input
+                          id="bet-pp-line"
+                          value={ppLine}
+                          onChange={e => setPpLine(e.target.value)}
+                          inputMode="decimal"
+                          placeholder="e.g., 22.5"
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Direction" htmlFor="bet-pp-direction" helperText="Over/Under on the player line" required>
+                        <Select
+                          id="bet-pp-direction"
+                          value={ppDirection}
+                          onChange={e => setPpDirection(e.target.value as typeof ppDirection)}
+                        >
+                          <option value="OVER">OVER</option>
+                          <option value="UNDER">UNDER</option>
                         </Select>
-                        <FormHelperText>Over/Under on the player line</FormHelperText>
-                      </FormControl>
+                      </FormField>
                       {commonEnd}
                     </>
                   );
                 case 'TEAM_PROP':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="Auto-set when you choose a game" />
-                      <FormControl>
-                        <InputLabel id="tp-team">Team</InputLabel>
-                        <Select labelId="tp-team" label="Team" value={tpTeam} onChange={e => setTpTeam(e.target.value as any)}>
-                          <MenuItem value="HOME">HOME</MenuItem><MenuItem value="AWAY">AWAY</MenuItem>
+                      <FormField label="Game ID" htmlFor="bet-tp-game" helperText="Auto-set when you choose a game" required>
+                        <Input id="bet-tp-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
+                      </FormField>
+                      <FormField label="Team" htmlFor="bet-tp-team" helperText="Which team the prop applies to" required>
+                        <Select
+                          id="bet-tp-team"
+                          value={tpTeam}
+                          onChange={e => setTpTeam(e.target.value as typeof tpTeam)}
+                        >
+                          <option value="HOME">HOME</option>
+                          <option value="AWAY">AWAY</option>
                         </Select>
-                        <FormHelperText>Which team the prop applies to</FormHelperText>
-                      </FormControl>
-                      <TextField label="Prop Type" value={tpPropType} onChange={e => setTpPropType(e.target.value)} placeholder="e.g., TOTAL_POINTS" required />
-                      <TextField label="Line" value={tpLine} onChange={e => setTpLine(e.target.value)} inputProps={{ inputMode: 'decimal' }} placeholder="e.g., 100.5" required />
-                      <FormControl>
-                        <InputLabel id="tp-dir">Direction</InputLabel>
-                        <Select labelId="tp-dir" label="Direction" value={tpDirection} onChange={e => setTpDirection(e.target.value as any)}>
-                          <MenuItem value="OVER">OVER</MenuItem><MenuItem value="UNDER">UNDER</MenuItem>
+                      </FormField>
+                      <FormField label="Prop Type" htmlFor="bet-tp-type" helperText="e.g., TOTAL_POINTS" required>
+                        <Input id="bet-tp-type" value={tpPropType} onChange={e => setTpPropType(e.target.value)} placeholder="e.g., TOTAL_POINTS" required />
+                      </FormField>
+                      <FormField label="Line" htmlFor="bet-tp-line" helperText="Numeric value for the prop" required>
+                        <Input
+                          id="bet-tp-line"
+                          value={tpLine}
+                          onChange={e => setTpLine(e.target.value)}
+                          inputMode="decimal"
+                          placeholder="e.g., 100.5"
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Direction" htmlFor="bet-tp-direction" helperText="Over/Under on the team line" required>
+                        <Select
+                          id="bet-tp-direction"
+                          value={tpDirection}
+                          onChange={e => setTpDirection(e.target.value as typeof tpDirection)}
+                        >
+                          <option value="OVER">OVER</option>
+                          <option value="UNDER">UNDER</option>
                         </Select>
-                        <FormHelperText>Over/Under on the team line</FormHelperText>
-                      </FormControl>
+                      </FormField>
                       {commonEnd}
                     </>
                   );
                 case 'SAME_GAME':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="The game your SGP applies to" />
-                      <TextField label="Legs (one per line)" value={sgpLegs} onChange={e => setSgpLegs(e.target.value)} multiline minRows={3} placeholder={`Example:\nHOME -3.5\nPLAYER X OVER 22.5 PTS`} required />
+                      <FormField label="Game ID" htmlFor="bet-sgp-game" helperText="The game your SGP applies to" required>
+                        <Input id="bet-sgp-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="The game your SGP applies to" required />
+                      </FormField>
+                      <FormField label="Legs (one per line)" htmlFor="bet-sgp-legs" helperText="Add each leg on a new line" required>
+                        <textarea
+                          id="bet-sgp-legs"
+                          className="fb-input"
+                          rows={3}
+                          value={sgpLegs}
+                          onChange={e => setSgpLegs(e.target.value)}
+                          placeholder={`Example:\nHOME -3.5\nPLAYER X OVER 22.5 PTS`}
+                          required
+                        />
+                      </FormField>
                       {commonEnd}
                     </>
                   );
                 case 'PARLAY':
                   return (
                     <>
-                      <TextField label="Game ID" value={gameId} onChange={e => setGameId(e.target.value)} required placeholder="Any related game ID (admin note)" />
-                      <TextField label="Legs (one per line)" value={parlayLegs} onChange={e => setParlayLegs(e.target.value)} multiline minRows={3} placeholder={`Example:\nGAME_A HOME ML\nGAME_B OVER 210.5`} required />
+                      <FormField label="Game ID" htmlFor="bet-parlay-game" helperText="Any related game ID (admin note)" required>
+                        <Input id="bet-parlay-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Any related game ID (admin note)" required />
+                      </FormField>
+                      <FormField label="Legs (one per line)" htmlFor="bet-parlay-legs" helperText="Add each leg on a new line" required>
+                        <textarea
+                          id="bet-parlay-legs"
+                          className="fb-input"
+                          rows={3}
+                          value={parlayLegs}
+                          onChange={e => setParlayLegs(e.target.value)}
+                          placeholder={`Example:\nGAME_A HOME ML\nGAME_B OVER 210.5`}
+                          required
+                        />
+                      </FormField>
                       {commonEnd}
                     </>
                   );
