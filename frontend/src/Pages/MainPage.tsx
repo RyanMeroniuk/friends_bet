@@ -11,6 +11,7 @@ import {
   Typography,
   AppBar,
   GlobalStyles,
+  Button,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 
@@ -34,7 +35,7 @@ export default function MainPage() {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* Force the left drawer background no matter what the theme does */}
+      {/* Keep drawer background consistent */}
       <GlobalStyles
         styles={{
           '.MuiDrawer-paper': {
@@ -50,27 +51,80 @@ export default function MainPage() {
         position="fixed"
         sx={{
           zIndex: (t) => t.zIndex.drawer + 1,
-          backgroundColor: 'var(--fb-deep)', // top bar color from your CSS vars
+          backgroundColor: 'var(--fb-deep)',
         }}
       >
-        <Toolbar sx={{ width: '100%' }}>
-          <Typography variant="h6" sx={{ mr: 2 }}>
+        <Toolbar
+          sx={{
+            width: '100%',
+            gap: 0.75,
+            minHeight: { xs: 56, sm: 64 },
+            pl: { xs: 1, sm: 2 },
+            pr: { xs: 1.75, sm: 2.75 }, // keep right cluster in view with slight inset
+            justifyContent: 'space-between',
+          }}
+        >
+          <Typography variant="h6" sx={{ mr: 2, flexShrink: 0 }}>
             FriendsBet
           </Typography>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Typography variant="body1" sx={{ ml: 2 }}>
+          {/* Right cluster — anchored right with slight inset so buttons stay visible */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,                 // tighter gap
+              minWidth: 0,
+              maxWidth: { xs: '70vw', sm: '60vw', md: '50vw' }, // guard against overflow
+              overflow: 'hidden',
+              mr: { xs: 1.5, sm: 2.5 }, // keep cluster away from screen edge
+            }}
+          >
+            <Typography
+              variant="body1"
+              noWrap
+              sx={{ maxWidth: { xs: 100, sm: 150, md: 200 }, minWidth: 0 }}
+              title={user.username}
+            >
               {user.username}
             </Typography>
-            <Typography variant="body2" sx={{ mx: 2 }}>
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{ opacity: 0.9, maxWidth: { xs: 140, sm: 180, md: 240 }, minWidth: 0 }}
+              title={user.email}
+            >
               ({user.email})
             </Typography>
-            <Typography variant="body2" sx={{ mr: 1 }}>
-              ID: <code>{user.id}</code>
-            </Typography>
-            <button onClick={copyId} style={{ marginRight: 12 }}>Copy ID</button>
-            <button onClick={handleLogout}>Logout</button>
-          </div>
+
+            {/* Actions — always visible */}
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={copyId}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.35)',
+                color: 'var(--fb-primary-contrast)',
+                '&:hover': { borderColor: 'rgba(255,255,255,0.6)' },
+                flexShrink: 0,
+              }}
+            >
+              Copy ID
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleLogout}
+              sx={{
+                color: 'var(--fb-primary-contrast)',
+                backgroundColor: 'rgba(255,255,255,0.16)',
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.22)' },
+                flexShrink: 0,
+              }}
+            >
+              Logout
+            </Button>
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -81,7 +135,7 @@ export default function MainPage() {
           flexShrink: 0,
           '& .MuiDrawer-paper': {
             width: drawerWidth,
-            mt: 8, // below app bar
+            mt: { xs: 7, sm: 8 }, // below app bar
           },
         }}
       >
