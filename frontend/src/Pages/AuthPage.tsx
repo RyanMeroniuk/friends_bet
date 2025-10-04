@@ -396,18 +396,6 @@ export default function AuthPage() {
                   />
                   Show password
                 </label>
-
-                {/* Optional "Forgot password?" (UI-only) */}
-                {mode === 'login' && (
-                  <button
-                    type="button"
-                    className="fb-btn fb-btn--ghost fb-btn--sm"
-                    onClick={() => pushToast('Forgot password flow (UI only)', 'info')}
-                    style={{ marginLeft: 'auto' }}
-                  >
-                    Forgot password?
-                  </button>
-                )}
               </div>
 
               {/* Strength meter only on Register */}
