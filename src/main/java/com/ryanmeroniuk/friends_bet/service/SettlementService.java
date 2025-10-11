@@ -113,6 +113,32 @@ public class SettlementService {
         return settled;
     }
 
+    /**
+     * Settle all accepted bets within a group by iterating over each game's settlement.
+     * Returns the total number of bets settled (matches {@link #settleGame(UUID)} semantics).
+     */
+    @Transactional
+    public int settleAcceptedBetsForGroup(UUID groupId) {
+        List<Bet> accepted = betRepo.findAllByGroupIdAndStatus(groupId, STATUS_ACCEPTED);
+        if (accepted.isEmpty()) {
+            return 0;
+        }
+
+        Set<UUID> gameIds = new LinkedHashSet<>();
+        for (Bet b : accepted) {
+            UUID gameId = b.getGameId();
+            if (gameId != null) {
+                gameIds.add(gameId);
+            }
+        }
+
+        int totalSettled = 0;
+        for (UUID gameId : gameIds) {
+            totalSettled += settleGame(gameId);
+        }
+        return totalSettled;
+    }
+
     // ---------- Outcome evaluation ----------
 
     private enum Outcome {

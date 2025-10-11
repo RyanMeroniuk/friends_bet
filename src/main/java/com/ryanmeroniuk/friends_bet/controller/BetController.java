@@ -4,21 +4,33 @@ import com.ryanmeroniuk.friends_bet.dto.AcceptBetRequest;
 import com.ryanmeroniuk.friends_bet.dto.BetResponse;
 import com.ryanmeroniuk.friends_bet.dto.CreateBetRequest;
 import com.ryanmeroniuk.friends_bet.service.BetService;
+import com.ryanmeroniuk.friends_bet.service.ScoreSyncService;
+import com.ryanmeroniuk.friends_bet.service.SettlementService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
 public class BetController {
     private final BetService betService;
+    private final SettlementService settlementService;
+    private final ScoreSyncService scoreSyncService;
 
-    public BetController(BetService betService) {
+    public BetController(BetService betService,
+                         SettlementService settlementService,
+                         ScoreSyncService scoreSyncService) {
         this.betService = betService;
+        this.settlementService = settlementService;
+        this.scoreSyncService = scoreSyncService;
     }
 
     /**
@@ -42,6 +54,39 @@ public class BetController {
 
         BetResponse resp = betService.propose(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
+    }
+
+    /**
+     * Manual settle: settle all accepted bets in a group.
+     * POST /api/groups/{groupId}/bets/settle-accepted
+     */
+    @PostMapping(
+            value = "/groups/{groupId}/bets/settle-accepted",
+            produces = "application/json"
+    )
+    public ResponseEntity<Map<String, Object>> settleAcceptedBets(@PathVariable UUID groupId) {
+        betService.ensureGroupExists(groupId);
+
+        Set<String> sports = betService.sportsForAcceptedBets(groupId);
+        List<String> scoreErrors = new ArrayList<>();
+        for (String sport : sports) {
+            try {
+                scoreSyncService.refreshScores(sport, null);
+            } catch (Exception ex) {
+                scoreErrors.add(sport + ": " + ex.getMessage());
+            }
+        }
+
+        int settled = settlementService.settleAcceptedBetsForGroup(groupId);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("settled", settled);
+        if (!sports.isEmpty()) {
+            body.put("sportsRefreshed", sports);
+        }
+        if (!scoreErrors.isEmpty()) {
+            body.put("scoreErrors", scoreErrors);
+        }
+        return ResponseEntity.ok(body);
     }
 
     /**

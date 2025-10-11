@@ -19,8 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -168,6 +170,45 @@ public class BetService {
         groupRepo.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
         return BetMapper.toResponse(betRepo.findAllByGroupId(groupId));
+    }
+
+    /** Ensure the given group exists or throw IllegalArgumentException for consistency. */
+    public void ensureGroupExists(UUID groupId) {
+        if (!groupRepo.existsById(groupId)) {
+            throw new IllegalArgumentException("Group not found");
+        }
+    }
+
+    /**
+     * Find unique sport keys for all ACCEPTED bets in the given group.
+     * Used to trigger score sync for the relevant sports before settlement runs.
+     */
+    public Set<String> sportsForAcceptedBets(UUID groupId) {
+        List<Bet> accepted = betRepo.findAllByGroupIdAndStatus(groupId, "ACCEPTED");
+        if (accepted.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<UUID> gameIds = new LinkedHashSet<>();
+        for (Bet b : accepted) {
+            UUID gameId = b.getGameId();
+            if (gameId != null) {
+                gameIds.add(gameId);
+            }
+        }
+
+        if (gameIds.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<String> sports = new LinkedHashSet<>();
+        for (Game g : gameRepo.findAllById(gameIds)) {
+            String sport = g.getSport();
+            if (sport != null && !sport.isBlank()) {
+                sports.add(sport);
+            }
+        }
+        return sports;
     }
 
     // ---------- Helpers ----------
