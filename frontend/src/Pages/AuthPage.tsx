@@ -9,6 +9,7 @@ import { ToastContainer, ToastItem } from '../components/Toast';
 
 /* password strength meter */
 import PasswordStrength from '../components/PasswordStrength';
+import betLogo from '../resources/bet_logo.png';
 
 type Errors = Partial<Record<'username' | 'email' | 'password' | 'usernameOrEmail', string>>;
 
@@ -213,18 +214,29 @@ export default function AuthPage() {
               border: '1px solid var(--fb-border, #E3E8F2)',
               display: 'grid',
               placeItems: 'center',
+              padding: 12,
               marginBottom: 16,
               transform: mounted ? 'scale(1)' : 'scale(0.98)',
               transition: 'transform 260ms ease',
             }}
             aria-hidden="true"
           >
-            <span style={{ fontWeight: 900, fontSize: 28, color: 'var(--fb-deep, #1B191A)' }}>
-              FB
-            </span>
+            <div
+              className="fb-brand-badge"
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: 'inherit',
+              }}
+            >
+              <img
+                src={betLogo}
+                alt="BigStu Bets logo"
+              />
+            </div>
           </div>
           <h1 style={{ margin: '0 0 6px', fontSize: 24, color: 'var(--fb-deep, #1B191A)' }}>
-            FriendsBet
+            BigStu Bets
           </h1>
           <p style={{ margin: 0, color: 'var(--fb-muted, #6C7482)' }}>
             Friendly wagers with your crew.

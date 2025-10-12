@@ -393,7 +393,7 @@ export default function GroupPage() {
               </div>
 
               {/* NEW: decorative brand badge */}
-              <div className="fb-brand-badge" title="FriendsBet">
+              <div className="fb-brand-badge" title="BigStu Bets">
                 <img src={betLogo} alt="" aria-hidden="true" />
               </div>
             </header>

@@ -29,6 +29,6 @@ export async function listGames(params?: {
   from?: string;
   to?: string;
 }): Promise<GameSummary[]> {
-  const resp = await api.get<GameSummary[]>('/api/games', { params });
+  const resp = await api.get<GameSummary[]>('/api/odds/games', { params });
   return resp.data;
 }

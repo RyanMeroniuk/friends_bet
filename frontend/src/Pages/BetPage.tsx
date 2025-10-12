@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listMyGroups, GroupResponse } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import { listGames, GameSummary } from '../api/game';
@@ -86,8 +86,26 @@ export default function BetPage() {
   const [sportsLoading, setSportsLoading] = useState<boolean>(false);
 
   const [games, setGames] = useState<GameSummary[]>([]);
+  const [gameLookup, setGameLookup] = useState<Record<string, { homeTeam: string; awayTeam: string }>>({});
   const [gamesLoading, setGamesLoading] = useState<boolean>(false);
   const selectedGame = useMemo(() => games.find(g => g.id === gameId), [games, gameId]);
+
+  const mergeGamesIntoLookup = useCallback((list: GameSummary[]) => {
+    if (!list || list.length === 0) return;
+    setGameLookup(prev => {
+      const next = { ...prev };
+      for (const g of list) {
+        next[g.id] = { homeTeam: g.homeTeam, awayTeam: g.awayTeam };
+      }
+      return next;
+    });
+  }, []);
+
+  const gameLabel = useCallback((gameId: string): string => {
+    const meta = gameLookup[gameId];
+    if (!meta) return gameId;
+    return `${meta.awayTeam} at ${meta.homeTeam}`;
+  }, [gameLookup]);
 
   const [busyRefresh, setBusyRefresh] = useState(false);
   const [busySettle, setBusySettle] = useState(false);
@@ -99,6 +117,21 @@ export default function BetPage() {
   const openRef = useRef<HTMLDivElement | null>(null);
   const groupStripRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const hasFetchedAllGamesRef = useRef(false);
+
+  const hydrateGamesForBets = useCallback(async (betList: Bet[]) => {
+    if (!betList || betList.length === 0) return;
+    const needsHydration = betList.some(b => b.gameId && !gameLookup[b.gameId]);
+    if (!needsHydration) return;
+    if (hasFetchedAllGamesRef.current) return;
+    try {
+      const allGames = await listGames();
+      mergeGamesIntoLookup(allGames);
+      hasFetchedAllGamesRef.current = true;
+    } catch (err) {
+      console.warn('Failed to hydrate game metadata', err);
+    }
+  }, [gameLookup, mergeGamesIntoLookup]);
 
   const [selectedBetId, setSelectedBetId] = useState<string | null>(null);
   const selectedBet = useMemo(() => bets.find(b => b.id === selectedBetId) || null, [bets, selectedBetId]);
@@ -140,6 +173,7 @@ export default function BetPage() {
       const data = await listBets(selectedGroup);
       setBets(data);
       setLastRefreshed(Date.now());
+      hydrateGamesForBets(data);
     } catch (e: any) {
       const msg = e?.response?.data || 'Could not load bets';
       setError(msg); pushToast(msg, 'error');
@@ -181,6 +215,7 @@ export default function BetPage() {
         const mapped: GameSummary[] = (list || []).map((g: any) => ({ id: g.id, homeTeam: g.homeTeam, awayTeam: g.awayTeam, startTime: g.startTime }));
         if (!cancelled) {
           setGames(mapped);
+          mergeGamesIntoLookup(mapped);
           if (mapped.length > 0) setGameId(prev => (prev && mapped.some(m => m.id === prev)) ? prev : mapped[0].id);
           else setGameId('');
         }
@@ -188,14 +223,18 @@ export default function BetPage() {
       finally { if (!cancelled) setGamesLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [selectedSport]);
+  }, [selectedSport, mergeGamesIntoLookup]);
 
   useEffect(() => {
     if (selectedSport) return;
     (async () => {
-      try { setGames(await listGames()); } catch (e) { console.warn('Failed to load games', e); }
+      try {
+        const all = await listGames();
+        setGames(all);
+        mergeGamesIntoLookup(all);
+      } catch (e) { console.warn('Failed to load games', e); }
     })();
-  }, [selectedSport]); // eslint-disable-line
+  }, [selectedSport, mergeGamesIntoLookup]);
 
   function resetMarketSpecificFields() {
     setPick('HOME');
@@ -310,6 +349,7 @@ export default function BetPage() {
           const list: any[] = await resGames.json();
           const mapped: GameSummary[] = (list || []).map((g: any) => ({ id: g.id, homeTeam: g.homeTeam, awayTeam: g.awayTeam, startTime: g.startTime }));
           setGames(mapped);
+          mergeGamesIntoLookup(mapped);
           if (mapped.length > 0) setGameId(prev => (prev && mapped.some(m => m.id === prev)) ? prev : mapped[0].id);
         }
         setGamesLoading(false);
@@ -413,7 +453,7 @@ export default function BetPage() {
   })) as GroupChip[];
 
   const q = betSearch.trim().toLowerCase();
-  const bySearch = (b: Bet) => !q || `${b.marketType} ${b.pick} ${b.gameId} ${b.status} ${formatPick(b)}`.toLowerCase().includes(q);
+  const bySearch = (b: Bet) => !q || `${b.marketType} ${b.pick} ${gameLabel(b.gameId)} ${b.status} ${formatPick(b)}`.toLowerCase().includes(q);
   const matchStatusTab = (b: Bet) => (
     statusTab === 'all' ||
     (statusTab === 'open' && b.status === 'OPEN') ||
@@ -454,6 +494,7 @@ export default function BetPage() {
   function BetCard(b: Bet) {
     const tone = statusTone(b.status);
     const isSelected = b.id === selectedBetId;
+    const title = gameLabel(b.gameId);
     return (
       <button
         key={b.id}
@@ -466,10 +507,10 @@ export default function BetPage() {
           background: 'var(--fb-surface)', borderRadius: 16, padding: 16, display: 'grid', gap: 12, cursor: 'pointer',
         }}
         aria-pressed={isSelected}
-        aria-label={`Select bet ${b.id}`}
+        aria-label={`Select bet ${title}`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontWeight: 700, color: 'var(--fb-text)', fontSize: 18 }}>{b.gameId}</div>
+          <div style={{ fontWeight: 700, color: 'var(--fb-text)', fontSize: 18 }}>{title}</div>
           <span className="fb-badge" style={{ background: tone.bg, color: tone.text, borderColor: 'var(--fb-border)', fontWeight: 700 }}>{b.status}</span>
         </div>
         <div className="fb-kv">
@@ -901,7 +942,7 @@ export default function BetPage() {
           <div style={{ color: 'var(--fb-muted)' }}>Select a bet card to view its details.</div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
-            <div style={{ fontWeight: 700, color: 'var(--fb-text)' }}>{selectedBet.gameId}</div>
+            <div style={{ fontWeight: 700, color: 'var(--fb-text)' }}>{gameLabel(selectedBet.gameId)}</div>
             <div className="fb-kv">
               <div className="fb-kv__row"><span className="fb-kv__label">Status</span><span className="fb-kv__value">{selectedBet.status}</span></div>
               <div className="fb-kv__row"><span className="fb-kv__label">Market</span><span className="fb-kv__value">{selectedBet.marketType}</span></div>

@@ -65,7 +65,7 @@ export default function MainPage() {
           }}
         >
           <Typography variant="h6" sx={{ mr: 2, flexShrink: 0 }}>
-            FriendsBet
+            BigStu Bets
           </Typography>
 
           {/* Right cluster — anchored right with slight inset so buttons stay visible */}
