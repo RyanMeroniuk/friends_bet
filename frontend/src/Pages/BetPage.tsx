@@ -31,13 +31,13 @@ type BetPrefs = {
   selectedSport?: string;
   selectedGameId?: string;
   marketType?: MarketType;
-  amountCents?: string;
+  amountDollars?: string;
   odds?: number;
   betSearch?: string;
   statusTab?: BetStatusFilter;
 };
 
-const AMOUNT_PRESETS = [500, 1000, 2500, 5000];
+const AMOUNT_PRESETS_DOLLARS = [5, 10, 25, 50];
 const ODDS_PRESETS = [1.5, 1.7, 1.9, 2.2];
 const MARKET_TYPES: MarketType[] = ['WINNER', 'SPREAD', 'TOTALS'];
 
@@ -73,7 +73,16 @@ export default function BetPage() {
     : 'WINNER';
   const [marketType, setMarketType] = useState<MarketType>(initialMarketType);
   const [pick, setPick] = useState<string>('HOME');
-  const [amountCents, setAmountCents] = useState<string>(initialPrefs.amountCents || '');
+  const initialAmount = (() => {
+    if (typeof initialPrefs.amountDollars === 'string') return initialPrefs.amountDollars;
+    const legacy = (initialPrefs as any).amountCents;
+    if (typeof legacy === 'string' && legacy.trim() !== '') {
+      const cents = Number.parseInt(legacy, 10);
+      if (!Number.isNaN(cents)) return String(cents / 100);
+    }
+    return '';
+  })();
+  const [amountDollars, setAmountDollars] = useState<string>(initialAmount);
   const [odds, setOdds] = useState<number>(typeof initialPrefs.odds === 'number' ? initialPrefs.odds : 1.8);
 
   const [spreadPoints, setSpreadPoints] = useState<string>('');
@@ -142,13 +151,13 @@ export default function BetPage() {
       selectedSport,
       selectedGameId: gameId,
       marketType,
-      amountCents,
+      amountDollars,
       odds,
       betSearch,
       statusTab,
     };
     localStorage.setItem(LS_KEY, JSON.stringify(prefs));
-  }, [selectedGroup, selectedSport, gameId, marketType, amountCents, odds, betSearch, statusTab]);
+  }, [selectedGroup, selectedSport, gameId, marketType, amountDollars, odds, betSearch, statusTab]);
 
   useEffect(() => {
     if (!userId) return;
@@ -270,7 +279,10 @@ export default function BetPage() {
   function handlePickGame(newGameId: string) { setGameId(newGameId); prefillFromGame(games.find(x => x.id === newGameId), marketType); }
   function handleMarketChange(next: MarketType) { setMarketType(next); setMessage(null); setError(null); resetMarketSpecificFields(); if (selectedGame) prefillFromGame(selectedGame, next); }
 
-  const stake = (parseInt(amountCents || '0', 10) || 0) / 100;
+  const stake = (() => {
+    const parsed = parseFloat(amountDollars || '0');
+    return Number.isNaN(parsed) ? 0 : Math.max(parsed, 0);
+  })();
   const potentialPayout = stake > 0 && odds > 1 ? stake * odds : 0;
   const potentialWin = stake > 0 && odds > 1 ? stake * (odds - 1) : 0;
 
@@ -278,9 +290,9 @@ export default function BetPage() {
     if (!userId) return 'User session missing';
     if (!selectedGroup) return 'Select a group';
     if (!gameId.trim()) return 'Game ID is required';
-    if (amountCents.trim() === '') return 'Amount (cents) is required';
-    const amt = parseInt(amountCents, 10);
-    if (Number.isNaN(amt) || amt <= 0) return 'Amount must be a positive integer (in cents)';
+    if (amountDollars.trim() === '') return 'Amount is required';
+    const amt = parseFloat(amountDollars);
+    if (Number.isNaN(amt) || amt <= 0) return 'Amount must be a positive number';
     if (Number.isNaN(odds) || odds <= 1.0) return 'Odds must be > 1.0';
     if (marketType === 'SPREAD') {
       const pts = Number(spreadPoints);
@@ -313,7 +325,10 @@ export default function BetPage() {
     }
 
     try {
-      await proposeBet(selectedGroup, userId, gameId.trim(), marketType, submitPick.toUpperCase(), parseInt(amountCents, 10), odds, details);
+      const dollars = parseFloat(amountDollars);
+      if (Number.isNaN(dollars) || dollars <= 0) throw new Error('Invalid amount');
+      const cents = Math.round(dollars * 100);
+      await proposeBet(selectedGroup, userId, gameId.trim(), marketType, submitPick.toUpperCase(), cents, odds, details);
       setMessage('Bet proposed!'); pushToast('Bet proposed!', 'success');
       resetMarketSpecificFields(); // keep amount/odds
       loadBets();
@@ -781,32 +796,33 @@ export default function BetPage() {
                   </FormField>
 
                   <FormField
-                    label="Amount (cents)"
+                    label="Amount ($)"
                     htmlFor="bet-amount"
-                    helperText="Set stake in cents"
+                    helperText="Enter wager amount"
                     required
                   >
                     <div style={{ display: 'grid', gap: 8 }}>
                       <Input
                         id="bet-amount"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={amountCents}
-                        onChange={e => setAmountCents(e.target.value.replace(/\D/g, ''))}
-                        placeholder="e.g., 2500"
+                        type="number"
+                        inputMode="decimal"
+                        min="1"
+                        step="0.01"
+                        value={amountDollars}
+                        onChange={e => setAmountDollars(e.target.value)}
+                        placeholder="e.g., 5"
                         required
                       />
                       <div className="fb-actions" role="group" aria-label="Quick amounts">
-                        {AMOUNT_PRESETS.map(cents => (
+                        {AMOUNT_PRESETS_DOLLARS.map(dollars => (
                           <button
-                            key={cents}
+                            key={dollars}
                             type="button"
                             className="fb-btn fb-btn--ghost fb-btn--sm"
-                            onClick={() => setAmountCents(String(cents))}
-                            title={`Set ${(cents / 100).toFixed(0)} dollars`}
+                            onClick={() => setAmountDollars(String(dollars))}
+                            title={`Set ${dollars.toFixed(0)} dollars`}
                           >
-                            {(cents / 100).toFixed(0)}
+                            {dollars.toFixed(0)}
                           </button>
                         ))}
                       </div>
@@ -912,7 +928,7 @@ export default function BetPage() {
               <button
                 type="button"
                 className="fb-btn fb-btn--primary fb-btn--md"
-                onClick={() => { setAmountCents(''); setOdds(1.8); resetMarketSpecificFields(); }}
+                onClick={() => { setAmountDollars(''); setOdds(1.8); resetMarketSpecificFields(); }}
                 style={{
                   background: '#111', borderColor: '#111', color: '#fff',
                   borderRadius: 12, paddingLeft: 22, paddingRight: 22,
