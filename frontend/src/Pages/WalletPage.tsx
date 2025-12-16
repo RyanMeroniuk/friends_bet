@@ -22,8 +22,7 @@ import ActionPanelSkeleton from '../components/ActionPanelSkeleton';
 import TxnListSkeleton from '../components/TxnListSkeleton';
 
 /* right-rail info cards */
-import FundingTipsCard from '../components/FundingTipsCard';
-import WalletSecurityCard from '../components/WalletSecurityCard';
+
 
 /* real data hooks in scope already */
 import { useAuth } from '../context/AuthContext';
@@ -284,29 +283,7 @@ export default function WalletPage() {
     }
   }
 
-  // Keyboard shortcuts
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const isTyping =
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          (target as any).isContentEditable);
-      if (isTyping) return;
 
-      const k = e.key.toLowerCase();
-      if (k === 'r') {
-        e.preventDefault();
-        handleRefresh();
-      } else if (k === 'g') {
-        e.preventDefault();
-        groupStripRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
 
   const main = (
     <>
@@ -320,10 +297,6 @@ export default function WalletPage() {
             <span className="fb-meta-row" style={{ gap: 6 }}>
               <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
                 Last refreshed {new Date(lastRefreshed).toLocaleTimeString()}
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>•</span>
-              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
-                Shortcuts: <kbd>R</kbd> refresh, <kbd>G</kbd> groups
               </span>
             </span>
           </div>
@@ -352,9 +325,7 @@ export default function WalletPage() {
           </div>
 
           {/* tiny meta helper row */}
-          <div className="fb-meta-row" style={{ marginTop: 8 }}>
-            <span>Tip: press <kbd>G</kbd> to jump here.</span>
-          </div>
+
         </SectionCard>
       </div>
 
@@ -597,8 +568,7 @@ export default function WalletPage() {
         </div>
       </SectionCard>
 
-      <FundingTipsCard />
-      <WalletSecurityCard />
+
     </RightRail>
   );
 

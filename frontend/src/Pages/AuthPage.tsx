@@ -197,7 +197,7 @@ export default function AuthPage() {
         <div
           style={{
             padding: 24,
-            background: 'var(--fb-accent-1, #f3ecde)',
+            background: 'var(--fb-accent-1)',
             borderRight: isMobile ? 'none' : '1px solid var(--fb-border, #E3E8F2)',
             display: 'grid',
             alignContent: 'center',
@@ -269,7 +269,7 @@ export default function AuthPage() {
               }}
               style={{
                 borderRadius: 8,
-                background: mode === 'register' ? 'var(--fb-accent-1, #f3ecde)' : 'transparent',
+                background: mode === 'register' ? 'var(--fb-accent-1)' : 'transparent',
               }}
               disabled={submitting}
             >
@@ -285,7 +285,7 @@ export default function AuthPage() {
               }}
               style={{
                 borderRadius: 8,
-                background: mode === 'login' ? 'var(--fb-accent-1, #f3ecde)' : 'transparent',
+                background: mode === 'login' ? 'var(--fb-accent-1)' : 'transparent',
               }}
               disabled={submitting}
             >

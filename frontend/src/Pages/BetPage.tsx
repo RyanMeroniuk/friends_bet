@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listMyGroups, GroupResponse } from '../api/group';
 import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import { listGames, GameSummary } from '../api/game';
-import { Typography } from '@mui/material';
+import { Typography, TextField, MenuItem, ToggleButton, ToggleButtonGroup, InputAdornment, Stack, Box, Autocomplete } from '@mui/material';
 
 import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi } from '../api/bet';
 import { useAuth } from '../context/AuthContext';
@@ -394,54 +394,64 @@ export default function BetPage() {
   }
 
   function SportGamePickers() {
-    const sportHelper =
-      sportsLoading ? 'Loading sports…'
-        : (sportsError ? sportsError : (selectedSport ? `Games: ${games.length}` : 'Pick a sport to load games'));
-
     return (
       <>
-        <FormField label="Sport" htmlFor="bet-sport" helperText={sportHelper} required>
-          <Select
-            id="bet-sport"
-            value={selectedSport}
-            onChange={e => setSelectedSport(e.target.value)}
-            disabled={sportsLoading}
-          >
-            <option value="">
-              {sportsLoading
-                ? 'Loading…'
-                : (sports.length ? 'Select a sport' : 'No sports available')}
-            </option>
-            {sports.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </Select>
-        </FormField>
+        <Autocomplete
+          id="bet-sport"
+          options={sports}
+          value={selectedSport}
+          onChange={(_, newValue) => setSelectedSport(newValue || '')}
+          disabled={sportsLoading}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Sport"
+              required
+              helperText={sportsLoading ? 'Loading sports…' : (sportsError || '')}
+              fullWidth
+            />
+          )}
+        />
 
-        <FormField
-          label="Pick Game"
-          htmlFor="bet-game"
-          helperText={gamesLoading ? 'Loading games…' : (selectedSport ? `${games.length} game${games.length === 1 ? '' : 's'}` : 'Select a sport to show games')}
-          required
-        >
-          <Select
-            id="bet-game"
-            value={gameId}
-            onChange={e => handlePickGame(e.target.value)}
-            disabled={gamesLoading || !selectedSport}
-          >
-            <option value="">
-              {gamesLoading
-                ? 'Loading…'
-                : (games.length ? 'Choose a game' : 'No games available')}
-            </option>
-            {games.map(g => (
-              <option key={g.id} value={g.id}>
-                {g.homeTeam} vs {g.awayTeam} — {new Date(g.startTime).toLocaleString()}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+        <Autocomplete
+          id="bet-game"
+          options={games}
+          getOptionLabel={(option) => {
+            // Handle both object and string (if value is just ID, but options are objects)
+            if (typeof option === 'string') {
+               const g = games.find(x => x.id === option);
+               return g ? `${g.awayTeam} @ ${g.homeTeam}` : option;
+            }
+            return `${option.awayTeam} @ ${option.homeTeam} — ${new Date(option.startTime).toLocaleDateString()}`;
+          }}
+          value={games.find(g => g.id === gameId) || null}
+          onChange={(_, newValue) => handlePickGame(newValue ? newValue.id : '')}
+          disabled={gamesLoading || !selectedSport}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Pick Game"
+              required
+              helperText={gamesLoading ? 'Loading games…' : (selectedSport ? `${games.length} game${games.length === 1 ? '' : 's'}` : 'Select a sport first')}
+              fullWidth
+            />
+          )}
+          renderOption={(props, option) => {
+            const { key, ...otherProps } = props;
+            return (
+              <li key={key} {...otherProps}>
+                <Box>
+                  <Typography variant="body1" fontWeight={600}>
+                    {option.awayTeam} @ {option.homeTeam}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {new Date(option.startTime).toLocaleString()}
+                  </Typography>
+                </Box>
+              </li>
+            );
+          }}
+        />
       </>
     );
   }
@@ -553,22 +563,7 @@ export default function BetPage() {
     );
   }
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target as any).isContentEditable);
-      if (isTyping) return;
-      const k = e.key.toLowerCase();
-      if (k === 'r') { e.preventDefault(); refreshOddsAndGames(); }
-      else if (k === 'a') { e.preventDefault(); settleAcceptedBets(); }
-      else if (k === 's') { e.preventDefault(); searchRef.current?.focus(); }
-      else if (k === 'o') { e.preventDefault(); openRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-      else if (k === 'k') { e.preventDefault(); groupStripRef.current?.focus(); }
-      else if (k === 'p') { e.preventDefault(); proposeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+
 
   const main = (
     <>
@@ -584,10 +579,6 @@ export default function BetPage() {
             </span>
             <span className="fb-meta-row" style={{ gap: 6 }}>
               <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>Last refreshed {new Date(lastRefreshed).toLocaleTimeString()}</span>
-              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>•</span>
-              <span style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
-                Shortcuts: <kbd>R</kbd> refresh, <kbd>A</kbd> settle, <kbd>S</kbd> search, <kbd>O</kbd> open, <kbd>K</kbd> groups, <kbd>P</kbd> propose
-              </span>
             </span>
           </div>
         }
@@ -598,7 +589,7 @@ export default function BetPage() {
           <div ref={groupStripRef} tabIndex={0} aria-label="Group selector" style={{ outline: 'none' }}>
             <GroupScroller groups={groupChips} onSelect={(id) => setSelectedGroup(id)} />
           </div>
-          <div className="fb-meta-row" style={{ marginTop: 8 }}><span>Tip: press <kbd>K</kbd> to focus this strip.</span></div>
+
         </SectionCard>
       </div>
 
@@ -730,219 +721,194 @@ export default function BetPage() {
             onSubmit={e => { e.preventDefault(); onPropose(); }}
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: 20,
-              columnGap: 28,
-              alignItems: 'start',
-              padding: '4px 8px 12px',
+              gridTemplateColumns: '1fr',
+              gap: 24,
+              padding: '12px 4px',
             }}
           >
-            <FormField
-              label="Your User ID"
-              htmlFor="bet-user-id"
-              helperText={userId ? 'Signed in' : 'Sign in again if empty'}
-              required
-            >
-              <Input id="bet-user-id" value={userId} readOnly required />
-            </FormField>
-
-            <FormField
-              label="Market Type"
-              htmlFor="bet-market-type"
-              helperText="Select a market for this bet"
-              required
-            >
-              <Select
-                id="bet-market-type"
-                value={marketType}
-                onChange={e => handleMarketChange(e.target.value as MarketType)}
-              >
-                <option value="WINNER">Moneyline (WINNER)</option>
-                <option value="SPREAD">Spread</option>
-                <option value="TOTALS">Totals (O/U)</option>
-              </Select>
-            </FormField>
-
-            <SportGamePickers />
-
-            {(() => {
-              const commonEnd = (
-                <>
-                  <FormField
-                    label="Odds (decimal)"
-                    htmlFor="bet-odds"
-                    helperText="Quick presets below"
-                    required
-                  >
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      <Input
-                        id="bet-odds"
-                        type="number"
-                        step="0.01"
-                        min="1.01"
-                        value={Number.isNaN(odds) ? '' : odds}
-                        onChange={e => setOdds(e.target.value === '' ? NaN : Number(e.target.value))}
-                        placeholder="e.g., 1.85"
-                        required
-                      />
-                      <div className="fb-actions" role="group" aria-label="Quick odds">
-                        {ODDS_PRESETS.map(o => (
-                          <button key={o} type="button" className="fb-btn fb-btn--ghost fb-btn--sm" onClick={() => setOdds(o)}>
-                            {o.toFixed(2)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </FormField>
-
-                  <FormField
-                    label="Amount ($)"
-                    htmlFor="bet-amount"
-                    helperText="Enter wager amount"
-                    required
-                  >
-                    <div style={{ display: 'grid', gap: 8 }}>
-                      <Input
-                        id="bet-amount"
-                        type="number"
-                        inputMode="decimal"
-                        min="1"
-                        step="0.01"
-                        value={amountDollars}
-                        onChange={e => setAmountDollars(e.target.value)}
-                        placeholder="e.g., 5"
-                        required
-                      />
-                      <div className="fb-actions" role="group" aria-label="Quick amounts">
-                        {AMOUNT_PRESETS_DOLLARS.map(dollars => (
-                          <button
-                            key={dollars}
-                            type="button"
-                            className="fb-btn fb-btn--ghost fb-btn--sm"
-                            onClick={() => setAmountDollars(String(dollars))}
-                            title={`Set ${dollars.toFixed(0)} dollars`}
-                          >
-                            {dollars.toFixed(0)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </FormField>
-
-                  <div className="fb-badge" style={{ gridColumn: '1 / -1', width: 'fit-content', background: '#fff' }} aria-live="polite">
-                    Stake: <b>${stake.toFixed(2)}</b> • &nbsp;Potential win: <b>${potentialWin.toFixed(2)}</b> • &nbsp;Payout: <b>${potentialPayout.toFixed(2)}</b>
-                  </div>
-                </>
-              );
-
-              switch (marketType) {
-                case 'WINNER':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-game-id" helperText="Auto-set when you choose a game" required>
-                        <Input id="bet-game-id" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
-                      </FormField>
-                      <FormField label="Pick" htmlFor="bet-winner-pick" helperText="Choose HOME or AWAY" required>
-                        <Select id="bet-winner-pick" value={pick} onChange={e => setPick(e.target.value)}>
-                          <option value="HOME">HOME</option>
-                          <option value="AWAY">AWAY</option>
-                        </Select>
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                case 'SPREAD':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-spread-game" helperText="Auto-set when you choose a game" required>
-                        <Input id="bet-spread-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
-                      </FormField>
-                      <FormField label="Team" htmlFor="bet-spread-team" helperText="Which side of the spread?" required>
-                        <Select id="bet-spread-team" value={pick} onChange={e => setPick(e.target.value)}>
-                          <option value="HOME">HOME</option>
-                          <option value="AWAY">AWAY</option>
-                        </Select>
-                      </FormField>
-                      <FormField label="Spread Points" htmlFor="bet-spread-points" helperText="Enter spread like -3.5" required>
-                        <Input
-                          id="bet-spread-points"
-                          value={spreadPoints}
-                          onChange={e => setSpreadPoints(e.target.value)}
-                          inputMode="decimal"
-                          placeholder="-3.5"
-                          required
-                        />
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                case 'TOTALS':
-                  return (
-                    <>
-                      <FormField label="Game ID" htmlFor="bet-totals-game" helperText="Auto-set when you choose a game" required>
-                        <Input id="bet-totals-game" value={gameId} onChange={e => setGameId(e.target.value)} placeholder="Auto-set when you choose a game" required />
-                      </FormField>
-                      <FormField label="Totals Line" htmlFor="bet-totals-line" helperText="Decimal line (e.g., 210.5)" required>
-                        <Input
-                          id="bet-totals-line"
-                          value={totalsLine}
-                          onChange={e => setTotalsLine(e.target.value)}
-                          inputMode="decimal"
-                          placeholder="e.g., 210.5"
-                          required
-                        />
-                      </FormField>
-                      <FormField label="Direction" htmlFor="bet-totals-direction" helperText="Over or Under the line" required>
-                        <Select
-                          id="bet-totals-direction"
-                          value={totalsDirection}
-                          onChange={e => setTotalsDirection(e.target.value as 'OVER' | 'UNDER')}
-                        >
-                          <option value="OVER">OVER</option>
-                          <option value="UNDER">UNDER</option>
-                        </Select>
-                      </FormField>
-                      {commonEnd}
-                    </>
-                  );
-                default:
-                  return null;
-              }
-            })()}
-
-            {/* SUBMIT ROW — CHANGED TO MATCH BLACK/WHITE ROUNDED BUTTONS */}
-            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12 }}>
-              <button
-                type="submit"
-                className="fb-btn fb-btn--primary fb-btn--md"
-                disabled={submitDisabled}
-                style={{
-                  background: '#111', borderColor: '#111', color: '#fff',
-                  borderRadius: 12, paddingLeft: 22, paddingRight: 22, opacity: submitDisabled ? 0.6 : 1,
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+              <TextField
+                label="Your User ID"
+                value={userId}
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: <InputAdornment position="start">@</InputAdornment>,
                 }}
-                aria-disabled={submitDisabled}
-              >
-                PROPOSE BET
-              </button>
+                helperText={userId ? 'Signed in' : 'Sign in again if empty'}
+                variant="outlined"
+                fullWidth
+              />
 
-              <button
-                type="button"
-                className="fb-btn fb-btn--primary fb-btn--md"
-                onClick={() => { setAmountDollars(''); setOdds(1.8); resetMarketSpecificFields(); }}
-                style={{
-                  background: '#111', borderColor: '#111', color: '#fff',
-                  borderRadius: 12, paddingLeft: 22, paddingRight: 22,
-                }}
-              >
-                CLEAR
-              </button>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  Market Type
+                </Typography>
+                <ToggleButtonGroup
+                  value={marketType}
+                  exclusive
+                  onChange={(_, newType) => { if (newType) handleMarketChange(newType); }}
+                  aria-label="market type"
+                  fullWidth
+                  size="small"
+                >
+                  <ToggleButton value="WINNER">Moneyline</ToggleButton>
+                  <ToggleButton value="SPREAD">Spread</ToggleButton>
+                  <ToggleButton value="TOTALS">Totals</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            </Box>
 
-              {submitDisabled && formError && (
-                <div className="fb-badge" style={{ marginLeft: 8, alignSelf: 'center' }}>
-                  {formError}
-                </div>
-              )}
-            </div>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+              <SportGamePickers />
+            </Box>
+
+            {/* Dynamic Market Fields */}
+            {marketType === 'SPREAD' && (
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                <TextField
+                  label="Spread Points"
+                  type="number"
+                  value={spreadPoints}
+                  onChange={e => setSpreadPoints(e.target.value)}
+                  placeholder="-3.5"
+                  helperText="Negative for favorite, positive for underdog"
+                  fullWidth
+                  required
+                />
+                <ToggleButtonGroup
+                  value={pick}
+                  exclusive
+                  onChange={(_, newPick) => { if (newPick) setPick(newPick); }}
+                  fullWidth
+                  size="small"
+                  sx={{ height: 56 }}
+                >
+                  <ToggleButton value="HOME">Home</ToggleButton>
+                  <ToggleButton value="AWAY">Away</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            )}
+
+            {marketType === 'TOTALS' && (
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                <TextField
+                  label="Total Line"
+                  type="number"
+                  value={totalsLine}
+                  onChange={e => setTotalsLine(e.target.value)}
+                  placeholder="e.g. 220.5"
+                  fullWidth
+                  required
+                />
+                <ToggleButtonGroup
+                  value={totalsDirection}
+                  exclusive
+                  onChange={(_, newDir) => { if (newDir) setTotalsDirection(newDir); }}
+                  fullWidth
+                  size="small"
+                  sx={{ height: 56 }}
+                >
+                  <ToggleButton value="OVER">Over</ToggleButton>
+                  <ToggleButton value="UNDER">Under</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            )}
+
+            {marketType === 'WINNER' && (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  Pick Winner
+                </Typography>
+                <ToggleButtonGroup
+                  value={pick}
+                  exclusive
+                  onChange={(_, newPick) => { if (newPick) setPick(newPick); }}
+                  fullWidth
+                >
+                  <ToggleButton value="HOME">Home Team</ToggleButton>
+                  <ToggleButton value="AWAY">Away Team</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            )}
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+              <Box>
+                <TextField
+                  label="Odds (decimal)"
+                  type="number"
+                  value={Number.isNaN(odds) ? '' : odds}
+                  onChange={e => setOdds(e.target.value === '' ? NaN : Number(e.target.value))}
+                  placeholder="1.90"
+                  inputProps={{ step: "0.01", min: "1.01" }}
+                  fullWidth
+                  required
+                />
+                <Stack direction="row" spacing={1} mt={1}>
+                  {ODDS_PRESETS.map(o => (
+                    <button
+                      key={o}
+                      type="button"
+                      className="fb-btn fb-btn--ghost fb-btn--sm"
+                      onClick={() => setOdds(o)}
+                      style={{ flex: 1 }}
+                    >
+                      {o.toFixed(2)}
+                    </button>
+                  ))}
+                </Stack>
+              </Box>
+
+              <Box>
+                <TextField
+                  label="Wager Amount"
+                  value={amountDollars}
+                  onChange={e => setAmountDollars(e.target.value)}
+                  placeholder="0.00"
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                  }}
+                  fullWidth
+                  required
+                />
+                <Stack direction="row" spacing={1} mt={1}>
+                  {AMOUNT_PRESETS_DOLLARS.map(a => (
+                    <button
+                      key={a}
+                      type="button"
+                      className="fb-btn fb-btn--ghost fb-btn--sm"
+                      onClick={() => setAmountDollars(String(a))}
+                      style={{ flex: 1 }}
+                    >
+                      ${a}
+                    </button>
+                  ))}
+                </Stack>
+              </Box>
+            </Box>
+
+            <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">Potential Payout</Typography>
+                <Typography variant="h6" color="primary.main" fontWeight={700}>
+                  ${potentialPayout.toFixed(2)}
+                </Typography>
+              </Box>
+              <Box textAlign="right">
+                <Typography variant="caption" color="text.secondary">Net Profit</Typography>
+                <Typography variant="body1" fontWeight={600} color="success.main">
+                  +${potentialWin.toFixed(2)}
+                </Typography>
+              </Box>
+            </Box>
+
+            <button
+              type="submit"
+              className="fb-btn fb-btn--primary fb-btn--lg"
+              disabled={submitDisabled}
+              style={{ width: '100%', marginTop: 8 }}
+            >
+              Propose Bet
+            </button>
           </form>
         )}
       </SectionCard>

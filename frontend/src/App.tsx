@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import theme from './theme';
 
 import AuthPage from './Pages/AuthPage';
 import MainPage from './Pages/MainPage';
@@ -36,32 +38,35 @@ function PublicAuthRoute() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/auth" element={<PublicAuthRoute />} />
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<PublicAuthRoute />} />
 
-        <Route
-          path="/dashboard/*"
-          element={
-            <RequireAuth>
-              <MainPage />
-            </RequireAuth>
-          }
-        >
-          <Route index element={<Navigate to="groups" replace />} />
-          <Route path="groups" element={<GroupPage />} />
-          <Route path="groups/:groupId/bets" element={<BetPage />} />
+          <Route
+            path="/dashboard/*"
+            element={
+              <RequireAuth>
+                <MainPage />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<Navigate to="groups" replace />} />
+            <Route path="groups" element={<GroupPage />} />
+            <Route path="groups/:groupId/bets" element={<BetPage />} />
 
-          {/* existing routes */}
-          <Route path="wallets" element={<WalletPage />} />
-          <Route path="bets" element={<BetPage />} />
+            {/* existing routes */}
+            <Route path="wallets" element={<WalletPage />} />
+            <Route path="bets" element={<BetPage />} />
 
-          <Route path="*" element={<Navigate to="groups" replace />} />
-        </Route>
+            <Route path="*" element={<Navigate to="groups" replace />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/auth" replace />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<Navigate to="/auth" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

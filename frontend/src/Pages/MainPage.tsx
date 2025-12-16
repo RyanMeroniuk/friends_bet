@@ -35,23 +35,14 @@ export default function MainPage() {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* Keep drawer background consistent */}
-      <GlobalStyles
-        styles={{
-          '.MuiDrawer-paper': {
-            backgroundColor: 'var(--fb-bg, #f7f8fb) !important',
-            backgroundImage: 'none !important',
-            boxSizing: 'border-box',
-            borderRight: '1px solid var(--fb-border)',
-          },
-        }}
-      />
+
 
       <AppBar
         position="fixed"
         sx={{
           zIndex: (t) => t.zIndex.drawer + 1,
-          backgroundColor: 'var(--fb-deep)',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
         }}
       >
         <Toolbar
@@ -64,7 +55,7 @@ export default function MainPage() {
             justifyContent: 'space-between',
           }}
         >
-          <Typography variant="h6" sx={{ mr: 2, flexShrink: 0 }}>
+          <Typography variant="h5" sx={{ mr: 2, flexShrink: 0, fontWeight: 800, letterSpacing: '-0.02em', background: 'linear-gradient(45deg, #2563eb, #06b6d4)', backgroundClip: 'text', textFillColor: 'transparent', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             BigStu Bets
           </Typography>
 
@@ -80,22 +71,14 @@ export default function MainPage() {
               mr: { xs: 1.5, sm: 2.5 }, // keep cluster away from screen edge
             }}
           >
-            <Typography
-              variant="body1"
-              noWrap
-              sx={{ maxWidth: { xs: 100, sm: 150, md: 200 }, minWidth: 0 }}
-              title={user.username}
-            >
-              {user.username}
-            </Typography>
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{ opacity: 0.9, maxWidth: { xs: 140, sm: 180, md: 240 }, minWidth: 0 }}
-              title={user.email}
-            >
-              ({user.email})
-            </Typography>
+            <Box sx={{ textAlign: 'right', mr: 2, display: { xs: 'none', sm: 'block' } }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                {user.username}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {user.email}
+              </Typography>
+            </Box>
 
             {/* Actions — always visible */}
             <Button
@@ -103,9 +86,9 @@ export default function MainPage() {
               size="small"
               onClick={copyId}
               sx={{
-                borderColor: 'rgba(255,255,255,0.35)',
-                color: 'var(--fb-primary-contrast)',
-                '&:hover': { borderColor: 'rgba(255,255,255,0.6)' },
+                borderColor: 'divider',
+                color: 'text.primary',
+                '&:hover': { borderColor: 'primary.main', background: 'transparent' },
                 flexShrink: 0,
               }}
             >
@@ -115,11 +98,10 @@ export default function MainPage() {
               variant="contained"
               size="small"
               onClick={handleLogout}
+              color="primary"
               sx={{
-                color: 'var(--fb-primary-contrast)',
-                backgroundColor: 'rgba(255,255,255,0.16)',
-                '&:hover': { backgroundColor: 'rgba(255,255,255,0.22)' },
                 flexShrink: 0,
+                boxShadow: 'none',
               }}
             >
               Logout
@@ -139,20 +121,20 @@ export default function MainPage() {
           },
         }}
       >
-        <List>
-          <ListItemButton component={Link} to="/dashboard/groups">
-            <ListItemText primary="Groups" />
+        <List sx={{ px: 2 }}>
+          <ListItemButton component={Link} to="/dashboard/groups" sx={{ borderRadius: 2, mb: 1 }}>
+            <ListItemText primary="Groups" primaryTypographyProps={{ fontWeight: 500 }} />
           </ListItemButton>
-          <ListItemButton component={Link} to="/dashboard/wallets">
-            <ListItemText primary="Wallets" />
+          <ListItemButton component={Link} to="/dashboard/wallets" sx={{ borderRadius: 2, mb: 1 }}>
+            <ListItemText primary="Wallets" primaryTypographyProps={{ fontWeight: 500 }} />
           </ListItemButton>
-          <ListItemButton component={Link} to="/dashboard/bets">
-            <ListItemText primary="Bets" />
+          <ListItemButton component={Link} to="/dashboard/bets" sx={{ borderRadius: 2, mb: 1 }}>
+            <ListItemText primary="Bets" primaryTypographyProps={{ fontWeight: 500 }} />
           </ListItemButton>
         </List>
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}>
         <Toolbar />
         <Outlet />
       </Box>

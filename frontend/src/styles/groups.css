@@ -1,12 +1,13 @@
 /* Namespaced to avoid clashing with existing styles */
 :root {
-  --fb-bg: #f7f8fb;
+  --fb-bg: #f8fafc;
   --fb-card-bg: #ffffff;
-  --fb-border: #c8ceda;
+  --fb-border: #e2e8f0;
   --fb-text: #0f172a;
   --fb-muted: #64748b;
-  --fb-radius: 14px;
-  --fb-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --fb-radius: 16px;
+  /* Slightly rounder for cards */
+  --fb-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --fb-space: 16px;
   --fb-space-lg: 24px;
   --fb-maxw: 1200px;
@@ -48,7 +49,7 @@
 }
 
 /* Right rail stack */
-.fb-rail > * + * {
+.fb-rail>*+* {
   margin-top: 16px;
 }
 
@@ -137,6 +138,7 @@
     grid-template-columns: 1fr;
   }
 }
+
 /* === Step 4: Groups grid & card === */
 
 .fb-groups-grid {
@@ -146,13 +148,21 @@
 }
 
 @media (min-width: 520px) {
-  .fb-groups-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fb-groups-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
+
 @media (min-width: 900px) {
-  .fb-groups-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fb-groups-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
+
 @media (min-width: 1200px) {
-  .fb-groups-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .fb-groups-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .fb-group-card {
@@ -166,15 +176,20 @@
   padding: 14px;
   transition: transform 0.02s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
+
 .fb-group-card:hover {
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
   border-color: #dbe3ee;
 }
+
 .fb-group-card:focus-visible {
   outline: none;
   box-shadow: var(--fb-focus);
 }
-.fb-group-card:active { transform: translateY(0.5px); }
+
+.fb-group-card:active {
+  transform: translateY(0.5px);
+}
 
 .fb-group-card.is-active {
   background: #eef5ff;
@@ -230,6 +245,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 /* === FriendsBet Groups theming (append to end) === */
 
 /* Title uses the dark blue to anchor the page */
@@ -240,21 +256,23 @@
   color: var(--fb-cl-navy);
 }
 
-/* Section headers underline with a peach tint */
-.fb-section-card > h3,
-.fb-section-card > header h3 {
-  border-bottom: 1px solid #efcfbf;
+/* Section headers */
+.fb-section-card>h3,
+.fb-section-card>header h3 {
+  border-bottom: 1px solid var(--fb-border);
   padding-bottom: 6px;
 }
 
-/* Grid cards feel a touch creamier */
+/* Grid cards */
 .fb-groups-grid,
 .fb-group-card {
-  --fb-grid-border: #efdfd4;
+  --fb-grid-border: var(--fb-border);
 }
+
 .fb-group-card {
   border-color: var(--fb-grid-border);
 }
+
 /* Blend the overall page surface into the app background */
 .fb-two-col {
   /* no card background here; let the app/page bg show through */

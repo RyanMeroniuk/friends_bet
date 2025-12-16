@@ -4,6 +4,7 @@ import com.ryanmeroniuk.friends_bet.dto.GameDto;
 import com.ryanmeroniuk.friends_bet.model.Game;
 import com.ryanmeroniuk.friends_bet.repository.GameRepository;
 import com.ryanmeroniuk.friends_bet.repository.OddsQuoteRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -17,10 +18,14 @@ public class GamesController {
 
     private final GameRepository gameRepo;
     private final OddsQuoteRepository quoteRepo;
+    private final String configuredSportKeys;
 
-    public GamesController(GameRepository gameRepo, OddsQuoteRepository quoteRepo) {
+    public GamesController(GameRepository gameRepo,
+                           OddsQuoteRepository quoteRepo,
+                           @Value("${odds.sportKeys:}") String configuredSportKeys) {
         this.gameRepo = gameRepo;
         this.quoteRepo = quoteRepo;
+        this.configuredSportKeys = configuredSportKeys;
     }
 
     /** 1) Sports with upcoming games in the next {days} (default 2) */
@@ -28,9 +33,16 @@ public class GamesController {
     public List<String> upcomingSports(@RequestParam(name = "days", defaultValue = "2") int days) {
         Instant now = Instant.now();
         Instant to = now.plus(days, ChronoUnit.DAYS);
-        return gameRepo.findDistinctSportsWithGamesBetween(now, to)
-                .stream()
-                .sorted()
+        List<String> dbSports = gameRepo.findDistinctSportsWithGamesBetween(now, to);
+
+        // Fall back to configured sportKeys so UI can show options even before games exist.
+        Set<String> merged = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        merged.addAll(dbSports);
+        merged.addAll(parseConfiguredSports());
+
+        return merged.stream()
+                .map(String::valueOf)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
 
@@ -80,5 +92,16 @@ public class GamesController {
 
     private static GameDto toDto(Game g) {
         return new GameDto(g.getId(), g.getSport(), g.getStartTime(), g.getHomeTeam(), g.getAwayTeam());
+    }
+
+    private List<String> parseConfiguredSports() {
+        if (configuredSportKeys == null || configuredSportKeys.isBlank()) return List.of();
+        String[] parts = configuredSportKeys.split(",");
+        List<String> out = new ArrayList<>(parts.length);
+        for (String p : parts) {
+            String s = p.trim();
+            if (!s.isEmpty()) out.add(s);
+        }
+        return out;
     }
 }
