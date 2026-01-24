@@ -46,6 +46,39 @@ public class JwtUtil {
         return claims.getBody();
     }
 
+    /**
+     * Extract the JTI from a token without full validation.
+     * Useful for logout where we want to revoke even expired/invalid tokens.
+     * Returns null if extraction fails.
+     */
+    public String extractJtiUnsafe(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                return null;
+            }
+            // Decode the payload (middle part) without signature verification
+            String payload = new String(Decoders.BASE64URL.decode(parts[1]));
+            // Simple JSON extraction for "jti" field
+            int jtiIndex = payload.indexOf("\"jti\"");
+            if (jtiIndex == -1) {
+                return null;
+            }
+            int colonIndex = payload.indexOf(':', jtiIndex);
+            int startQuote = payload.indexOf('"', colonIndex);
+            int endQuote = payload.indexOf('"', startQuote + 1);
+            if (startQuote == -1 || endQuote == -1) {
+                return null;
+            }
+            return payload.substring(startQuote + 1, endQuote);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private TokenDetails buildToken(User user, long ttlMs, TokenType type) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plusMillis(ttlMs);

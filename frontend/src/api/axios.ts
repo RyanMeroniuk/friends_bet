@@ -15,6 +15,8 @@ const api = axios.create({
 let accessToken: string | null = null;
 let tokenListener: ((token: string | null) => void) | null = null;
 let refreshPromise: Promise<string> | null = null;
+let lastRefreshTime = 0;
+const REFRESH_COOLDOWN_MS = 1000; // Prevent duplicate refreshes within 1 second
 
 export function setAxiosAccessToken(token: string | null) {
   accessToken = token;
@@ -47,6 +49,14 @@ api.interceptors.request.use((config: AuthAxiosRequestConfig) => {
 });
 
 async function requestNewAccessToken(): Promise<string> {
+  const now = Date.now();
+
+  // If we just refreshed successfully and there's no active promise,
+  // return the current token (it's fresh) - prevents race condition
+  if (!refreshPromise && accessToken && now - lastRefreshTime < REFRESH_COOLDOWN_MS) {
+    return accessToken;
+  }
+
   if (!refreshPromise) {
     const config = {
       skipAuthRefresh: true, // don't attach stale Authorization on refresh call
@@ -59,6 +69,7 @@ async function requestNewAccessToken(): Promise<string> {
         if (!token) throw new Error('Refresh returned no accessToken');
         setAxiosAccessToken(token);
         emitToken(token);
+        lastRefreshTime = Date.now(); // Track successful refresh
         return token;
       })
       .finally(() => {

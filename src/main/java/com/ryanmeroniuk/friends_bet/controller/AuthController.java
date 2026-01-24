@@ -105,14 +105,16 @@ public class AuthController {
     public ResponseEntity<Void> logout(HttpServletRequest req, HttpServletResponse res) {
         Cookie cookie = WebUtils.getCookie(req, "refresh");
         if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+            String jti = null;
             try {
                 Claims claims = jwtUtil.parseAndValidate(cookie.getValue());
-                String jti = claims.getId();
-                if (jti != null) {
-                    tokenService.revokeRefreshToken(jti);
-                }
-            } catch (JwtException | IllegalArgumentException ignored) {
-                // If parsing fails we still clear the cookie below.
+                jti = claims.getId();
+            } catch (JwtException | IllegalArgumentException e) {
+                // Validation failed (expired/invalid) - try unsafe extraction as fallback
+                jti = jwtUtil.extractJtiUnsafe(cookie.getValue());
+            }
+            if (jti != null) {
+                tokenService.revokeRefreshToken(jti);
             }
         }
 
