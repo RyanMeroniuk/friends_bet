@@ -197,7 +197,7 @@ class SettlementServiceTest {
 
     private void mockGameAndBets(Game game, Bet... bets) {
         when(gameRepo.findById(game.getId())).thenReturn(Optional.of(game));
-        when(betRepo.findByGameId(game.getId())).thenReturn(List.of(bets));
+        when(betRepo.findByGameIdForUpdate(game.getId())).thenReturn(List.of(bets));
     }
 
     private Game finalGame(UUID id, int homeScore, int awayScore) {

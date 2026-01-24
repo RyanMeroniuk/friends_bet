@@ -143,7 +143,7 @@ class BetServiceTest {
         bet.setStatus("OPEN");
         bet.setCutoffTime(Instant.now().plusSeconds(600));
 
-        when(betRepository.findById(betId)).thenReturn(Optional.of(bet));
+        when(betRepository.findByIdForUpdate(betId)).thenReturn(Optional.of(bet));
         when(groupMemberRepository.existsByGroup_IdAndUser_Id(groupId, acceptorId)).thenReturn(true);
         when(betRepository.save(any(Bet.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -181,7 +181,7 @@ class BetServiceTest {
         bet.setOdds(1.5);
         bet.setStatus("OPEN");
 
-        when(betRepository.findById(betId)).thenReturn(Optional.of(bet));
+        when(betRepository.findByIdForUpdate(betId)).thenReturn(Optional.of(bet));
 
         User proposer = buildUser(proposerId, "same-user");
         authenticate(proposer);

@@ -58,7 +58,8 @@ public class SettlementService {
         Game g = gameRepo.findById(gameId).orElseThrow();
         if (!g.isFinal() || g.getHomeScore() == null || g.getAwayScore() == null) return 0;
 
-        List<Bet> allOnGame = betRepo.findByGameId(gameId);
+        // Use pessimistic locking to prevent double settlement from concurrent calls
+        List<Bet> allOnGame = betRepo.findByGameIdForUpdate(gameId);
         int settled = 0;
 
         for (Bet b : allOnGame) {

@@ -7,7 +7,8 @@ export type AuthAxiosRequestConfig = InternalAxiosRequestConfig & {
 };
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  // Use a relative base URL so CRA dev proxy (and same-origin prod) works.
+  baseURL: '',
   withCredentials: true, // required to send the HttpOnly refresh cookie
 });
 

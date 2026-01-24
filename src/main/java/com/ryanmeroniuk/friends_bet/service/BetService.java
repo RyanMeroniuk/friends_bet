@@ -131,7 +131,8 @@ public class BetService {
         }
         req.setAcceptorId(actor);
 
-        Bet bet = betRepo.findById(betId)
+        // Use pessimistic locking to prevent two users from accepting the same bet
+        Bet bet = betRepo.findByIdForUpdate(betId)
                 .orElseThrow(() -> new IllegalArgumentException("Bet not found"));
 
         if (!"OPEN".equals(bet.getStatus())) {

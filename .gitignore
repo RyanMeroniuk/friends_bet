@@ -1,0 +1,14 @@
+.DS_Store
+
+# Java / Spring
+target/
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+
+# Local env files (keep non-secret committed envs explicit)
+.env.local
+.env.*.local
+

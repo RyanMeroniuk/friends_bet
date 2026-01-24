@@ -40,8 +40,9 @@ public class WalletService {
         User user = userRepo.findById(req.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        Wallet w = walletRepo.findByGroupAndUser(group, user)
-                .orElse(new Wallet(group, user));
+        // Use pessimistic locking to prevent race conditions on concurrent deposits/withdrawals
+        Wallet w = walletRepo.findByGroupAndUserForUpdate(group, user)
+                .orElseGet(() -> walletRepo.save(new Wallet(group, user)));
 
         long newBalance = w.getBalanceCents() + req.getAmountCents();
         if (newBalance < 0) {

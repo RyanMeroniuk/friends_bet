@@ -1,0 +1,77 @@
+---
+date: 2026-01-23
+type: code-quality
+status: in_progress
+---
+
+goal: Tighten up codebase - fix bugs, improve code quality, address security issues
+
+completed:
+  - title: Fixed race conditions with pessimistic locking
+    files_changed:
+      - src/main/java/com/ryanmeroniuk/friends_bet/repository/WalletRepository.java
+      - src/main/java/com/ryanmeroniuk/friends_bet/service/WalletService.java
+      - src/main/java/com/ryanmeroniuk/friends_bet/repository/BetRepository.java
+      - src/main/java/com/ryanmeroniuk/friends_bet/service/BetService.java
+      - src/main/java/com/ryanmeroniuk/friends_bet/service/SettlementService.java
+      - src/test/java/com/ryanmeroniuk/friends_bet/service/BetServiceTest.java
+      - src/test/java/com/ryanmeroniuk/friends_bet/service/SettlementServiceTest.java
+    details:
+      - "WalletRepository: Added findByGroupAndUserForUpdate() with @Lock(PESSIMISTIC_WRITE)"
+      - "WalletService: Now uses locked query to prevent concurrent overdrafts"
+      - "BetRepository: Added findByIdForUpdate() and findByGameIdForUpdate() with pessimistic locking"
+      - "BetService.accept(): Uses locked query to prevent two users accepting same bet"
+      - "SettlementService.settleGame(): Uses locked query to prevent double payouts"
+      - "All tests updated and passing (9/9)"
+
+remaining_critical:
+  - title: Admin endpoints unprotected
+    location: SecurityConfig.java:71
+    issue: Any authenticated user can access admin endpoints (settle bets, override scores)
+    fix: Add role-based access control, require ADMIN role
+
+  - title: No rate limiting on auth endpoints
+    location: AuthController.java
+    issue: Brute force attacks possible on login/register
+    fix: Add rate limiting with Bucket4j or Resilience4j
+
+remaining_high:
+  - title: No group membership checks on bet operations
+    location: BetController.java:45,67,113
+    issue: Users can bet in groups they don't belong to
+
+  - title: Missing input validation
+    location: All controllers
+    issue: No @Valid annotations, no constraints on DTOs
+
+  - title: Timing attack in login
+    location: UserService.java:43-51
+    issue: Username enumeration via response time analysis
+
+  - title: No password strength validation
+    location: UserService.java:26-37
+    issue: Users can set weak passwords like "1"
+
+remaining_medium:
+  - title: Inconsistent error handling
+    issue: Mix of String, ResponseEntity, exceptions across controllers
+    fix: Add @ControllerAdvice for centralized error handling
+
+  - title: Hardcoded token TTLs
+    issue: Should be configurable in application.yml
+
+  - title: Unbounded queries
+    location: OddsController.java:40, GamesController.java
+    issue: findAll() could return thousands of rows
+
+audit_reports:
+  - .claude/cache/agents/scout/output-*.md (service audit)
+  - .claude/cache/agents/scout/output-*.md (controller audit)
+  - .claude/cache/agents/scout/output-*.md (security audit)
+
+tests_status: All passing (9/9)
+
+next:
+  - Secure admin endpoints with role-based access
+  - Add input validation to all DTOs
+  - Implement rate limiting on auth endpoints

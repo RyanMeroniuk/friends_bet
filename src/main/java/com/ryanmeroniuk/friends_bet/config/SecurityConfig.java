@@ -1,7 +1,9 @@
 package com.ryanmeroniuk.friends_bet.config;
 
 import com.ryanmeroniuk.friends_bet.filter.JwtAuthenticationFilter;
+import com.ryanmeroniuk.friends_bet.filter.AdminSecretFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,14 +19,21 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 @Configuration
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final AdminSecretFilter adminSecretFilter;
+    private final String corsAllowedOrigins;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          AdminSecretFilter adminSecretFilter,
+                          @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}") String corsAllowedOrigins) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.adminSecretFilter = adminSecretFilter;
+        this.corsAllowedOrigins = corsAllowedOrigins;
     }
 
     @Bean
@@ -50,6 +59,7 @@ public class SecurityConfig {
                                 "/api/users/logout",
                                 "/ping",
                                 "/actuator/health",
+                                "/actuator/info",
                                 "/h2-console/**"
                         ).permitAll()
 
@@ -57,9 +67,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/sports/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
 
+                        // Admin endpoints require auth (+ secret enforced by AdminSecretFilter)
+                        .requestMatchers("/api/admin/**").authenticated()
+
                         // Everything else under /api/** requires a valid access token
                         .requestMatchers("/api/**").authenticated()
                 )
+                .addFilterBefore(adminSecretFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -68,7 +82,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        configuration.setAllowedOrigins(parseCorsOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
@@ -76,6 +90,15 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private List<String> parseCorsOrigins() {
+        // Comma-separated origins; default supports CRA and Vite dev servers.
+        return Stream.of(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
     }
 
     @Bean

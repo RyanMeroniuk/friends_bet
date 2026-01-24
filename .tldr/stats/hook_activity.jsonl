@@ -1,0 +1,7 @@
+{"hook_name": "arch-context-inject", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"tasks_processed": 1, "arch_injected": 1}, "timestamp": "2026-01-24T00:09:31.495382+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-01-24T00:09:31.495382+00:00"}
+{"hook_name": "smart-search-router", "invocations": 1, "successes": 1, "failures": 0, "metrics": {"queries_routed": 1, "literal_queries": 1}, "timestamp": "2026-01-24T00:09:31.495382+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_notified": 2, "reindexes_triggered": 0}, "timestamp": "2026-01-24T00:11:08.671558+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_processed": 3, "symbols_shown": 12}, "timestamp": "2026-01-24T00:11:08.671558+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-01-24T00:12:24.918850+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 19}, "timestamp": "2026-01-24T00:12:24.918850+00:00"}

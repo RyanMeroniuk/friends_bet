@@ -40,16 +40,18 @@ public class AuthController {
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccessTokenResponse> register(@RequestBody CreateUserRequest req,
+                                                        HttpServletRequest httpReq,
                                                         HttpServletResponse res) {
         User saved = userService.register(req);
         TokenService.TokenPair pair = tokenService.issueTokenPair(saved);
-        writeRefreshCookie(res, pair.refreshToken());
+        writeRefreshCookie(httpReq, res, pair.refreshToken());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new AccessTokenResponse(pair.accessToken()));
     }
 
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccessTokenResponse> login(@RequestBody LoginRequest req,
+                                                     HttpServletRequest httpReq,
                                                      HttpServletResponse res) {
         User user;
         try {
@@ -59,7 +61,7 @@ public class AuthController {
         }
 
         TokenService.TokenPair pair = tokenService.issueTokenPair(user);
-        writeRefreshCookie(res, pair.refreshToken());
+        writeRefreshCookie(httpReq, res, pair.refreshToken());
         return ResponseEntity.ok(new AccessTokenResponse(pair.accessToken()));
     }
 
@@ -95,7 +97,7 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.getMessage());
         }
 
-        writeRefreshCookie(res, pair.refreshToken());
+        writeRefreshCookie(req, res, pair.refreshToken());
         return ResponseEntity.ok(new AccessTokenResponse(pair.accessToken()));
     }
 
@@ -114,7 +116,7 @@ public class AuthController {
             }
         }
 
-        clearRefreshCookie(res);
+        clearRefreshCookie(req, res);
         return ResponseEntity.noContent().build();
     }
 
@@ -134,26 +136,34 @@ public class AuthController {
         return ex.getMessage();
     }
 
-    private void writeRefreshCookie(HttpServletResponse response, String refreshToken) {
+    private void writeRefreshCookie(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    String refreshToken) {
         Duration maxAge = tokenService.getRefreshTokenTtl();
         ResponseCookie cookie = ResponseCookie.from("refresh", refreshToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(isHttps(request))
                 .sameSite("Lax")
-                .path("/api/users/refresh")
+                .path("/api/users")
                 .maxAge(maxAge)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private void clearRefreshCookie(HttpServletResponse response) {
+    private void clearRefreshCookie(HttpServletRequest request, HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from("refresh", "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(isHttps(request))
                 .sameSite("Lax")
-                .path("/api/users/refresh")
+                .path("/api/users")
                 .maxAge(Duration.ZERO)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    private static boolean isHttps(HttpServletRequest request) {
+        if (request.isSecure()) return true;
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        return forwardedProto != null && forwardedProto.equalsIgnoreCase("https");
     }
 }

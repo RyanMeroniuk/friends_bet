@@ -1,11 +1,13 @@
 spring:
   application:
     name: friends_bet
-  profiles:
-    active: dev
 jwt:
-  secret: s4qr0OiO8Jfxsj1nAAcYVRWxPKgIfucQExCfFIrMzN0=
-  expiration-ms: 3600000
+  # Base64-encoded HS256 secret (do not commit the secret value).
+  secret: ${JWT_SECRET_B64}
+
+admin:
+  # Optional: when set, required as `X-Admin-Secret` for `/api/admin/**`.
+  secret: ${ADMIN_SECRET:}
 
 odds:
   source: theoddsapi
@@ -17,4 +19,3 @@ odds:
     nfl: americanfootball_nfl
   sportKeys: basketball_nba,americanfootball_nfl,baseball_mlb,icehockey_nhl
   refreshMillis: 180000
-
