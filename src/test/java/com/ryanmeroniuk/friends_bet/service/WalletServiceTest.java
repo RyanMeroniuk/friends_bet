@@ -5,14 +5,18 @@ import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
 import com.ryanmeroniuk.friends_bet.model.Group;
 import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.model.Wallet;
+import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,8 +39,16 @@ class WalletServiceTest {
     @Mock
     private UserRepository userRepo;
 
+    @Mock
+    private GroupMemberRepository groupMemberRepo;
+
     @InjectMocks
     private WalletService walletService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void deposit_createsNewWallet_whenNoneExists() {
@@ -152,10 +164,16 @@ class WalletServiceTest {
     void listBalances_returnsAllWallets() {
         UUID groupId = UUID.randomUUID();
         Group group = buildGroup(groupId);
-        User user1 = buildUser(UUID.randomUUID());
+        User actor = buildUser(UUID.randomUUID());
         User user2 = buildUser(UUID.randomUUID());
 
-        Wallet w1 = new Wallet(group, user1);
+        // Set up auth context
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(actor.getUsername(), null, List.of()));
+        when(userRepo.findByUsername(actor.getUsername())).thenReturn(Optional.of(actor));
+        when(groupMemberRepo.existsByGroup_IdAndUser_Id(groupId, actor.getId())).thenReturn(true);
+
+        Wallet w1 = new Wallet(group, actor);
         w1.setBalanceCents(3_000L);
         Wallet w2 = new Wallet(group, user2);
         w2.setBalanceCents(7_000L);

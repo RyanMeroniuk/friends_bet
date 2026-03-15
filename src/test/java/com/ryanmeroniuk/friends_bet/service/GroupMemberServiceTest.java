@@ -8,11 +8,14 @@ import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +42,11 @@ class GroupMemberServiceTest {
 
     @InjectMocks
     private GroupMemberService groupMemberService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void joinGroup_success() {
@@ -124,6 +132,12 @@ class GroupMemberServiceTest {
         User user2 = buildUser(UUID.randomUUID(), "bob");
         GroupMember m1 = new GroupMember(group, user1);
         GroupMember m2 = new GroupMember(group, user2);
+
+        // Set up auth context as user1 (a member)
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user1.getUsername(), null, List.of()));
+        when(userRepo.findByUsername(user1.getUsername())).thenReturn(Optional.of(user1));
+        when(memberRepo.existsByGroup_IdAndUser_Id(groupId, user1.getId())).thenReturn(true);
 
         when(groupRepo.findById(groupId)).thenReturn(Optional.of(group));
         when(memberRepo.findAllByGroup(group)).thenReturn(List.of(m1, m2));

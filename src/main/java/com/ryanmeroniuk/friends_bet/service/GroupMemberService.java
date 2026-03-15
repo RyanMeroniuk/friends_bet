@@ -10,6 +10,7 @@ import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -89,6 +90,11 @@ public class GroupMemberService {
         Group group = groupRepo.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
+        UUID actor = currentUserId();
+        if (!memberRepo.existsByGroup_IdAndUser_Id(groupId, actor)) {
+            throw new IllegalArgumentException("Not a member of this group");
+        }
+
         return memberRepo.findAllByGroup(group).stream()
                 .map(m -> new GroupMemberResponse(
                         m.getId(),
@@ -98,5 +104,12 @@ public class GroupMemberService {
                         m.getUser().getUsername()
                 ))
                 .collect(Collectors.toList());
+    }
+
+    private UUID currentUserId() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepo.findByUsername(username)
+                .map(u -> u.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Auth user not found"));
     }
 }

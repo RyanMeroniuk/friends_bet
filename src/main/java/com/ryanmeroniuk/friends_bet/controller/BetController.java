@@ -65,7 +65,7 @@ public class BetController {
             produces = "application/json"
     )
     public ResponseEntity<Map<String, Object>> settleAcceptedBets(@PathVariable UUID groupId) {
-        betService.ensureGroupExists(groupId);
+        betService.ensureGroupExistsAndMember(groupId);
 
         Set<String> sports = betService.sportsForAcceptedBets(groupId);
         List<String> scoreErrors = new ArrayList<>();

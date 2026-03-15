@@ -170,7 +170,22 @@ public class BetService {
     public List<BetResponse> listByGroup(UUID groupId) {
         groupRepo.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+        UUID actor = currentUserId();
+        if (!groupMemberRepo.existsByGroup_IdAndUser_Id(groupId, actor)) {
+            throw new IllegalArgumentException("Not a member of this group");
+        }
         return BetMapper.toResponse(betRepo.findAllByGroupId(groupId));
+    }
+
+    /** Ensure the given group exists and the authenticated user is a member. */
+    public void ensureGroupExistsAndMember(UUID groupId) {
+        if (!groupRepo.existsById(groupId)) {
+            throw new IllegalArgumentException("Group not found");
+        }
+        UUID actor = currentUserId();
+        if (!groupMemberRepo.existsByGroup_IdAndUser_Id(groupId, actor)) {
+            throw new IllegalArgumentException("Not a member of this group");
+        }
     }
 
     /** Ensure the given group exists or throw IllegalArgumentException for consistency. */

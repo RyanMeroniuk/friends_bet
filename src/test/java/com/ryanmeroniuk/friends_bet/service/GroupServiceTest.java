@@ -8,11 +8,14 @@ import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +41,17 @@ class GroupServiceTest {
 
     @InjectMocks
     private GroupService groupService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void setAuthUser(User user) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user.getUsername(), null, List.of()));
+        when(userRepo.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+    }
 
     @Test
     void createGroup_savesAndReturnsDto() {
@@ -70,6 +84,7 @@ class GroupServiceTest {
     void listGroupsForUser_success() {
         UUID userId = UUID.randomUUID();
         User user = buildUser(userId);
+        setAuthUser(user);
 
         Group g1 = new Group("Group A");
         Group g2 = new Group("Group B");
@@ -89,6 +104,9 @@ class GroupServiceTest {
     @Test
     void listGroupsForUser_userNotFound_throws() {
         UUID userId = UUID.randomUUID();
+        User user = buildUser(userId);
+        setAuthUser(user);
+
         when(userRepo.findById(userId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> groupService.listGroupsForUser(userId))
@@ -100,6 +118,7 @@ class GroupServiceTest {
     void listGroupsForUser_noMemberships_returnsEmpty() {
         UUID userId = UUID.randomUUID();
         User user = buildUser(userId);
+        setAuthUser(user);
 
         when(userRepo.findById(userId)).thenReturn(Optional.of(user));
         when(memberRepo.findAllByUser(user)).thenReturn(Collections.emptyList());

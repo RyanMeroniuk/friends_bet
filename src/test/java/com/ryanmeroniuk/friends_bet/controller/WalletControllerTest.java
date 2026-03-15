@@ -6,6 +6,7 @@ import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
 import com.ryanmeroniuk.friends_bet.config.SecurityConfig;
 import com.ryanmeroniuk.friends_bet.filter.AdminSecretFilter;
 import com.ryanmeroniuk.friends_bet.filter.JwtAuthenticationFilter;
+import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.service.UserDetailsService;
 import com.ryanmeroniuk.friends_bet.service.WalletService;
 import com.ryanmeroniuk.friends_bet.support.TestJwtHelper;
@@ -24,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -55,22 +57,32 @@ class WalletControllerTest {
     @MockitoBean
     private UserDetailsService userDetailsService;
 
+    @MockitoBean
+    private UserRepository userRepository;
+
     private String accessToken;
+    private UUID authUserId;
 
     @BeforeEach
     void setUpAuth() {
-        UUID userId = UUID.randomUUID();
+        authUserId = UUID.randomUUID();
         String username = "testuser";
-        accessToken = TestJwtHelper.generateAccessToken(username, userId);
+        accessToken = TestJwtHelper.generateAccessToken(username, authUserId);
 
         Claims claims = new io.jsonwebtoken.impl.DefaultClaims();
         claims.setSubject(username);
         claims.put("token_type", "access");
-        claims.put("uid", userId.toString());
+        claims.put("uid", authUserId.toString());
 
         when(jwtUtil.parseAndValidate(accessToken)).thenReturn(claims);
         when(userDetailsService.loadUserByUsername(username)).thenReturn(
                 User.builder().username(username).password("pw").roles("USER").build());
+
+        // WalletController resolves authenticated user's ID via UserRepository
+        com.ryanmeroniuk.friends_bet.model.User authUser =
+                new com.ryanmeroniuk.friends_bet.model.User(username, username + "@test.com", "hashed");
+        authUser.setId(authUserId);
+        when(userRepository.findByUsername(username)).thenReturn(Optional.of(authUser));
     }
 
     // ── Deposit ──

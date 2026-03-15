@@ -8,6 +8,7 @@ import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -46,6 +47,11 @@ public class GroupService {
      * Only groups the given user belongs to.
      */
     public List<GroupResponse> listGroupsForUser(UUID userId) {
+        UUID actor = currentUserId();
+        if (!actor.equals(userId)) {
+            throw new IllegalArgumentException("Cannot view another user's groups");
+        }
+
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -53,6 +59,13 @@ public class GroupService {
                 .map(GroupMember::getGroup)
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    private UUID currentUserId() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepo.findByUsername(username)
+                .map(u -> u.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Auth user not found"));
     }
 
     private GroupResponse toDto(Group g) {

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.security.MessageDigest;
 
 @Component
 public class AdminSecretFilter extends OncePerRequestFilter {
@@ -34,7 +35,7 @@ public class AdminSecretFilter extends OncePerRequestFilter {
         }
 
         String header = request.getHeader("X-Admin-Secret");
-        if (header == null || header.isBlank() || !adminSecret.equals(header)) {
+        if (header == null || header.isBlank() || !MessageDigest.isEqual(adminSecret.getBytes(), header.getBytes())) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid admin secret");
             return;
         }

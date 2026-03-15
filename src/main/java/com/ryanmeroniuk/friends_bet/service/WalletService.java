@@ -5,9 +5,11 @@ import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
 import com.ryanmeroniuk.friends_bet.model.Group;
 import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.model.Wallet;
+import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,13 +22,16 @@ public class WalletService {
     private final WalletRepository walletRepo;
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
+    private final GroupMemberRepository groupMemberRepo;
 
     public WalletService(WalletRepository walletRepo,
                          GroupRepository groupRepo,
-                         UserRepository userRepo) {
+                         UserRepository userRepo,
+                         GroupMemberRepository groupMemberRepo) {
         this.walletRepo = walletRepo;
         this.groupRepo = groupRepo;
         this.userRepo = userRepo;
+        this.groupMemberRepo = groupMemberRepo;
     }
 
     /**
@@ -61,10 +66,22 @@ public class WalletService {
         Group group = groupRepo.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
+        UUID actor = currentUserId();
+        if (!groupMemberRepo.existsByGroup_IdAndUser_Id(groupId, actor)) {
+            throw new IllegalArgumentException("Not a member of this group");
+        }
+
         return walletRepo.findAllByGroup(group).stream()
                 .map(w -> new WalletResponse(
                         w.getUser().getId(),
                         w.getBalanceCents()))
                 .collect(Collectors.toList());
+    }
+
+    private UUID currentUserId() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepo.findByUsername(username)
+                .map(u -> u.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Auth user not found"));
     }
 }
