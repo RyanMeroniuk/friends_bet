@@ -1,0 +1,2 @@
+frontend:build:cd /Users/ryanmeroniuk/friends_bet/frontend && npm run build
+frontend:tsc:cd /Users/ryanmeroniuk/friends_bet/frontend && npx tsc --noEmit
