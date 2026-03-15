@@ -3,6 +3,7 @@ package com.ryanmeroniuk.friends_bet.controller;
 import com.ryanmeroniuk.friends_bet.dto.WalletDepositRequest;
 import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
 import com.ryanmeroniuk.friends_bet.service.WalletService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +22,7 @@ public class WalletController {
     @PostMapping("/deposit")
     public ResponseEntity<WalletResponse> deposit(
             @PathVariable UUID groupId,
-            @RequestBody WalletDepositRequest req
+            @Valid @RequestBody WalletDepositRequest req
     ) {
         WalletResponse resp = walletService.deposit(groupId, req);
         return ResponseEntity.ok(resp);

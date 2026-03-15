@@ -27,13 +27,16 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AdminSecretFilter adminSecretFilter;
     private final String corsAllowedOrigins;
+    private final boolean h2ConsoleEnabled;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           AdminSecretFilter adminSecretFilter,
-                          @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}") String corsAllowedOrigins) {
+                          @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}") String corsAllowedOrigins,
+                          @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.adminSecretFilter = adminSecretFilter;
         this.corsAllowedOrigins = corsAllowedOrigins;
+        this.h2ConsoleEnabled = h2ConsoleEnabled;
     }
 
     @Bean
@@ -44,35 +47,39 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(frame -> frame.disable()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // NEW: make unauthenticated => 401, access denied => 403
+                // Make unauthenticated => 401, access denied => 403
                 .exceptionHandling(h -> h
-                        .authenticationEntryPoint((req, res, ex) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED)) // 401
-                        .accessDeniedHandler((req, res, ex) -> res.sendError(HttpServletResponse.SC_FORBIDDEN))          // 403
+                        .authenticationEntryPoint((req, res, ex) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+                        .accessDeniedHandler((req, res, ex) -> res.sendError(HttpServletResponse.SC_FORBIDDEN))
                 )
 
-                .authorizeHttpRequests(auth -> auth
-                        // Auth endpoints + health are public
-                        .requestMatchers(
-                                "/api/users/register",
-                                "/api/users/login",
-                                "/api/users/refresh",
-                                "/api/users/logout",
-                                "/ping",
-                                "/actuator/health",
-                                "/actuator/info",
-                                "/h2-console/**"
-                        ).permitAll()
+                .authorizeHttpRequests(auth -> {
+                    // Auth endpoints + health are public
+                    auth.requestMatchers(
+                            "/api/users/register",
+                            "/api/users/login",
+                            "/api/users/refresh",
+                            "/api/users/logout",
+                            "/ping",
+                            "/actuator/health",
+                            "/actuator/info"
+                    ).permitAll();
 
-                        // (Optional) public read for browse; keep if you intend this
-                        .requestMatchers(HttpMethod.GET, "/api/sports/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/games/**").permitAll()
+                    // H2 console only permitted when explicitly enabled (dev profile)
+                    if (h2ConsoleEnabled) {
+                        auth.requestMatchers("/h2-console/**").permitAll();
+                    }
 
-                        // Admin endpoints require auth (+ secret enforced by AdminSecretFilter)
-                        .requestMatchers("/api/admin/**").authenticated()
+                    // Public read for sports/games browsing
+                    auth.requestMatchers(HttpMethod.GET, "/api/sports/**").permitAll();
+                    auth.requestMatchers(HttpMethod.GET, "/api/games/**").permitAll();
 
-                        // Everything else under /api/** requires a valid access token
-                        .requestMatchers("/api/**").authenticated()
-                )
+                    // Admin endpoints require auth (+ secret enforced by AdminSecretFilter)
+                    auth.requestMatchers("/api/admin/**").authenticated();
+
+                    // Everything else under /api/** requires a valid access token
+                    auth.requestMatchers("/api/**").authenticated();
+                })
                 .addFilterBefore(adminSecretFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

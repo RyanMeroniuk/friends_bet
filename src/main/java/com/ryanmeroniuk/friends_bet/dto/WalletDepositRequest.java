@@ -1,9 +1,15 @@
 package com.ryanmeroniuk.friends_bet.dto;
 
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public class WalletDepositRequest {
+
+    @NotNull(message = "User ID is required")
     private UUID userId;
+
+    // Note: amountCents can be negative (withdrawal) or positive (deposit)
+    // Business logic validates sufficient funds, not the DTO
     private long amountCents;
 
     public WalletDepositRequest() {}

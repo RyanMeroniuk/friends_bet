@@ -1,0 +1,196 @@
+session: friends-bet-onboard
+date: "2026-03-14"
+project_path: /Users/ryanmeroniuk/friends_bet
+
+# ── Tech Stack ───────────────────────────────────────────────────────────────
+tech_stack:
+  backend:
+    language: Java 17
+    framework: Spring Boot 3.5.0
+    build_tool: Maven (mvnw wrapper)
+    security: Spring Security + JWT (jjwt 0.11.5), refresh token rotation
+    database: PostgreSQL 16 (prod), H2 (test scope)
+    orm: Spring Data JPA / Hibernate
+    migrations: Flyway (V2..V9 applied, baseline-on-migrate enabled)
+    http_client: Spring WebFlux WebClient (reactive, for external Odds API calls)
+    validation: spring-boot-starter-validation (Jakarta Bean Validation)
+    actuator: /actuator/health, /actuator/info exposed
+    test_framework: JUnit 5 via spring-boot-starter-test
+  frontend:
+    language: TypeScript
+    framework: React 19 (Create React App / react-scripts 5)
+    ui_library: MUI v7 (Material UI) + Emotion
+    routing: react-router-dom v6
+    http_client: Axios (proxied to localhost:8080)
+    state: React Context (AuthContext, GroupContext)
+  infrastructure:
+    containerization: Docker Compose (postgres:16 service only; app runs natively)
+    database_name: friendsbet
+    database_user: friendsbet
+    database_port: 5432
+
+# ── External Integrations ────────────────────────────────────────────────────
+external_integrations:
+  - name: The Odds API
+    url: https://api.the-odds-api.com/v4
+    purpose: Fetch live odds (h2h, spreads, totals) and final scores for NBA, NFL, MLB, NHL
+    config_key: ODDS_API_KEY env var
+    refresh_cadence: odds every 3 min, scores every 60 sec (configurable via application.yml)
+
+# ── Domain Model ─────────────────────────────────────────────────────────────
+domain:
+  description: >
+    friends_bet is a peer-to-peer sports betting platform for friend groups.
+    Users join Groups, fund per-group Wallets, propose Bets on real Games,
+    and have those bets accepted by other group members. Settlement is automatic
+    once final scores are fetched from The Odds API.
+
+  core_entities:
+    User:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/User.java
+      notes: Username + hashed password; linked to Wallets and Bets.
+    Group:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/Group.java
+      notes: Scopes membership and wallets; users join via invite code.
+    GroupMember:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/GroupMember.java
+      notes: Join table between User and Group.
+    Wallet:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/Wallet.java
+      notes: Per-user per-group balance in cents. Pessimistic lock on writes.
+    Game:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/Game.java
+      notes: Mirrors The Odds API event. Tracks externalGameId, teams, startTime, final scores.
+    Bet:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/Bet.java
+      notes: >
+        Central entity. Status lifecycle: OPEN -> ACCEPTED -> RESOLVED | VOID.
+        Stores proposerStake (amountCents) and acceptorStake (acceptorStakeCents = A*(odds-1)).
+        Markets: WINNER, SPREAD, TOTALS, PLAYER_PROP, PARLAY, etc.
+        JSONB `details` column carries spread/total lines and settlement summary.
+    OddsQuote:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/OddsQuote.java
+      notes: Cached odds snapshot for a game/market, refreshed from API.
+    RefreshToken:
+      file: src/main/java/com/ryanmeroniuk/friends_bet/model/RefreshToken.java
+      notes: Persisted JWT refresh tokens for rotation.
+
+# ── Architecture ─────────────────────────────────────────────────────────────
+architecture:
+  pattern: Layered monolith (Controller -> Service -> Repository)
+  money_flow: >
+    All amounts stored in cents (long). Wallet.deposit() is the single write path,
+    called with negative amounts to escrow and positive amounts to credit.
+    Pessimistic locking (SELECT FOR UPDATE) on Wallet and Bet rows prevents race conditions.
+  bet_lifecycle:
+    - "propose(): debit proposer stake; status = OPEN"
+    - "accept(): debit acceptor stake; status = ACCEPTED"
+    - "settle (WINNER): credit full pool to winner; status = RESOLVED"
+    - "settle (PUSH/VOID): refund each side; status = VOID"
+  settlement_pipeline:
+    - "ScoreSyncService polls The Odds API /scores every 60s"
+    - "When completed=true, calls SettlementService.setFinalScore()"
+    - "SettlementService.settleGame() evaluates each ACCEPTED bet outcome"
+    - "Market support: WINNER (h2h), SPREAD (spreadPoints from details), TOTALS (totalLine from details)"
+    - "Unknown markets return NEEDS_DATA (no settlement until supported)"
+  auth:
+    - "JWT access token (short-lived) + persisted refresh token"
+    - "JwtAuthenticationFilter on all requests"
+    - "AdminSecretFilter guards /api/admin/** via X-Admin-Secret header"
+  odds_warmup: "OddsWarmup @PostConstruct pre-fetches odds on startup"
+
+# ── Key Files ────────────────────────────────────────────────────────────────
+key_files:
+  entry_points:
+    - path: src/main/java/com/ryanmeroniuk/friends_bet/FriendsBetApplication.java
+      purpose: Spring Boot main class
+    - path: frontend/src/index.tsx
+      purpose: React entry point
+    - path: frontend/src/App.tsx
+      purpose: Router and top-level layout
+
+  controllers:
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/AuthController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/BetController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/GroupController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/WalletController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/GamesController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/OddsController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/AdminController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/GlobalExceptionHandler.java
+
+  services:
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/BetService.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/SettlementService.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/WalletService.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/ScoreSyncService.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/OddsService.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/UserService.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/service/TokenService.java
+
+  config:
+    - src/main/java/com/ryanmeroniuk/friends_bet/config/SecurityConfig.java
+    - src/main/resources/application.yml
+    - docker-compose.yml
+
+  migrations:
+    - src/main/resources/db/migration/V2__bets_market_details.sql
+    - src/main/resources/db/migration/V9__wallet_balance_constraint_and_audit.sql
+
+  tests:
+    - src/test/java/com/ryanmeroniuk/friends_bet/service/BetServiceTest.java
+    - src/test/java/com/ryanmeroniuk/friends_bet/service/SettlementServiceTest.java
+    - src/test/java/com/ryanmeroniuk/friends_bet/service/WalletServiceConcurrencyTest.java
+
+  recently_modified_git:
+    - src/main/java/com/ryanmeroniuk/friends_bet/config/SecurityConfig.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/AuthController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/GroupController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/WalletController.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/dto/CreateBetRequest.java
+    - src/main/java/com/ryanmeroniuk/friends_bet/controller/GlobalExceptionHandler.java  # new untracked
+
+# ── Commands ─────────────────────────────────────────────────────────────────
+commands:
+  backend:
+    dev: "./mvnw spring-boot:run"
+    test: "./mvnw test"
+    build: "./mvnw package -DskipTests"
+    db_start: "docker compose up -d"
+    db_reset: "./scripts/db-reset.sh"
+  frontend:
+    dev: "cd frontend && npm start"
+    test: "cd frontend && npm test"
+    build: "cd frontend && npm run build"
+  required_env:
+    - JWT_SECRET_B64
+    - ODDS_API_KEY
+    - ADMIN_SECRET  # optional
+
+# ── Recent Activity (from git log) ───────────────────────────────────────────
+recent_activity:
+  - "WalletService tightened with test cases (concurrency/balance constraint)"
+  - "Three race conditions fixed (pessimistic locks on Wallet, Bet)"
+  - "UI changes ongoing"
+  - "SettlementService test cases added"
+  - "GlobalExceptionHandler added (untracked - new file)"
+
+# ── Open Questions ────────────────────────────────────────────────────────────
+open_questions:
+  - "UNCONFIRMED: What triggers ScoreSyncService polling - is there a @Scheduled annotation or is it admin-only?"
+  - "UNCONFIRMED: V1 migration not in the migrations/ folder - likely the initial schema; may be in a baseline"
+  - "UNCONFIRMED: GlobalExceptionHandler is a new untracked file - intent is to centralize 400 error handling from controllers"
+  - "UNCONFIRMED: Frontend Pages (AuthPage, BetPage, GroupPage, WalletPage) - routing structure not yet read"
+
+# ── Suggested Next Actions ───────────────────────────────────────────────────
+suggested_next_actions:
+  - action: "Commit GlobalExceptionHandler.java (currently untracked)"
+    why: "New centralized error handler is complete but not staged"
+  - action: "Check @Scheduled on ScoreSyncService or AdminController for polling trigger"
+    why: "Settlement depends on score sync cadence; not yet verified"
+  - action: "Review DTO validation annotations (modified files in git status)"
+    why: "CreateBetRequest, CreateGroupRequest, CreateUserRequest, etc. were modified - likely adding @NotNull/@Valid"
+  - action: "Add integration tests for BetController and GroupController"
+    why: "Only service-layer tests exist; controller/endpoint behavior is untested"
+  - action: "Frontend: verify AuthContext token refresh flow matches backend refresh token API"
+    why: "Backend has refresh token rotation; frontend behavior not yet read"

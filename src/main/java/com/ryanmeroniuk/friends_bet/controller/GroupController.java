@@ -6,6 +6,7 @@ import com.ryanmeroniuk.friends_bet.dto.JoinGroupRequest;
 import com.ryanmeroniuk.friends_bet.dto.GroupMemberResponse;
 import com.ryanmeroniuk.friends_bet.service.GroupService;
 import com.ryanmeroniuk.friends_bet.service.GroupMemberService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +29,7 @@ public class GroupController {
 
     /** Create a new group */
     @PostMapping("/groups")
-    public ResponseEntity<GroupResponse> create(@RequestBody CreateGroupRequest req) {
+    public ResponseEntity<GroupResponse> create(@Valid @RequestBody CreateGroupRequest req) {
         GroupResponse resp = groupService.createGroup(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
@@ -49,7 +50,7 @@ public class GroupController {
     @PostMapping("/groups/{inviteCode}/join")
     public ResponseEntity<GroupMemberResponse> join(
             @PathVariable String inviteCode,
-            @RequestBody JoinGroupRequest req
+            @Valid @RequestBody JoinGroupRequest req
     ) {
         GroupMemberResponse resp = memberService.joinGroup(inviteCode, req);
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);

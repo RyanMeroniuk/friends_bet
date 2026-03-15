@@ -1,18 +1,37 @@
 package com.ryanmeroniuk.friends_bet.dto;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
 public class CreateBetRequest {
+
+    @NotNull(message = "Group ID is required")
     private UUID groupId;
-    private UUID proposerId;
+
+    private UUID proposerId; // Set from authenticated user, not required in request
+
+    @NotNull(message = "Game ID is required")
     private UUID gameId;
+
+    @NotBlank(message = "Market type is required")
     private String marketType;
+
+    @NotBlank(message = "Pick is required")
     private String pick;
+
+    @Min(value = 1, message = "Bet amount must be at least 1 cent")
     private long amountCents;
+
+    @Positive(message = "Odds must be greater than 0")
     private double odds;
+
     private Map<String, Object> details;
+
     private Instant cutoffTime;
 
     public CreateBetRequest() {}

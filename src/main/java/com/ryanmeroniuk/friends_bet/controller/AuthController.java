@@ -11,6 +11,7 @@ import com.ryanmeroniuk.friends_bet.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.Cookie;
+import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.*;
@@ -39,7 +40,7 @@ public class AuthController {
     }
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<AccessTokenResponse> register(@RequestBody CreateUserRequest req,
+    public ResponseEntity<AccessTokenResponse> register(@Valid @RequestBody CreateUserRequest req,
                                                         HttpServletRequest httpReq,
                                                         HttpServletResponse res) {
         User saved = userService.register(req);
@@ -50,7 +51,7 @@ public class AuthController {
     }
 
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<AccessTokenResponse> login(@RequestBody LoginRequest req,
+    public ResponseEntity<AccessTokenResponse> login(@Valid @RequestBody LoginRequest req,
                                                      HttpServletRequest httpReq,
                                                      HttpServletResponse res) {
         User user;
