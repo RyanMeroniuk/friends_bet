@@ -55,6 +55,6 @@ public class UserService {
 
     public User requireByUsername(String username) {
         return userRepo.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
     }
 }

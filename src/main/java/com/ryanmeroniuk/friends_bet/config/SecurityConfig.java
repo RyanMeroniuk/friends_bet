@@ -2,6 +2,7 @@ package com.ryanmeroniuk.friends_bet.config;
 
 import com.ryanmeroniuk.friends_bet.filter.JwtAuthenticationFilter;
 import com.ryanmeroniuk.friends_bet.filter.AdminSecretFilter;
+import com.ryanmeroniuk.friends_bet.filter.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -26,17 +27,23 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AdminSecretFilter adminSecretFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final String corsAllowedOrigins;
     private final boolean h2ConsoleEnabled;
+    private final String[] activeProfiles;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           AdminSecretFilter adminSecretFilter,
-                          @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}") String corsAllowedOrigins,
-                          @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled) {
+                          RateLimitFilter rateLimitFilter,
+                          @Value("${app.cors.allowed-origins:}") String corsAllowedOrigins,
+                          @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled,
+                          org.springframework.core.env.Environment environment) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.adminSecretFilter = adminSecretFilter;
+        this.rateLimitFilter = rateLimitFilter;
         this.corsAllowedOrigins = corsAllowedOrigins;
         this.h2ConsoleEnabled = h2ConsoleEnabled;
+        this.activeProfiles = environment.getActiveProfiles();
     }
 
     @Bean
@@ -80,6 +87,7 @@ public class SecurityConfig {
                     // Everything else under /api/** requires a valid access token
                     auth.requestMatchers("/api/**").authenticated();
                 })
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(adminSecretFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -100,12 +108,20 @@ public class SecurityConfig {
     }
 
     private List<String> parseCorsOrigins() {
-        // Comma-separated origins; default supports CRA and Vite dev servers.
-        return Stream.of(corsAllowedOrigins.split(","))
+        List<String> origins = Stream.of(corsAllowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .toList();
+        if (origins.isEmpty()) {
+            boolean isDev = java.util.Arrays.stream(activeProfiles)
+                    .anyMatch(p -> p.equals("dev") || p.equals("test") || p.equals("local"));
+            if (!isDev) {
+                throw new IllegalStateException(
+                        "app.cors.allowed-origins must be set in non-dev profiles");
+            }
+        }
+        return origins;
     }
 
     @Bean

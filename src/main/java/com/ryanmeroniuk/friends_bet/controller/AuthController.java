@@ -5,6 +5,7 @@ import com.ryanmeroniuk.friends_bet.dto.CreateUserRequest;
 import com.ryanmeroniuk.friends_bet.dto.LoginRequest;
 import com.ryanmeroniuk.friends_bet.dto.UserProfileResponse;
 import com.ryanmeroniuk.friends_bet.model.User;
+import com.ryanmeroniuk.friends_bet.service.TokenDenyListService;
 import com.ryanmeroniuk.friends_bet.service.TokenService;
 import com.ryanmeroniuk.friends_bet.service.UserService;
 import com.ryanmeroniuk.friends_bet.util.JwtUtil;
@@ -32,11 +33,14 @@ public class AuthController {
     private final UserService userService;
     private final TokenService tokenService;
     private final JwtUtil jwtUtil;
+    private final TokenDenyListService tokenDenyList;
 
-    public AuthController(UserService userService, TokenService tokenService, JwtUtil jwtUtil) {
+    public AuthController(UserService userService, TokenService tokenService,
+                          JwtUtil jwtUtil, TokenDenyListService tokenDenyList) {
         this.userService = userService;
         this.tokenService = tokenService;
         this.jwtUtil = jwtUtil;
+        this.tokenDenyList = tokenDenyList;
     }
 
     @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -104,6 +108,17 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest req, HttpServletResponse res) {
+        // Deny the access token so it can't be used for the remaining TTL
+        String authHeader = req.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                Claims accessClaims = jwtUtil.parseAndValidate(authHeader.substring(7));
+                tokenDenyList.deny(accessClaims.getId());
+            } catch (Exception ignored) {
+                // Access token may be expired/invalid — best-effort
+            }
+        }
+
         Cookie cookie = WebUtils.getCookie(req, "refresh");
         if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
             String jti = null;
@@ -146,7 +161,7 @@ public class AuthController {
         ResponseCookie cookie = ResponseCookie.from("refresh", refreshToken)
                 .httpOnly(true)
                 .secure(isHttps(request))
-                .sameSite("Lax")
+                .sameSite("Strict")
                 .path("/api/users")
                 .maxAge(maxAge)
                 .build();
@@ -157,7 +172,7 @@ public class AuthController {
         ResponseCookie cookie = ResponseCookie.from("refresh", "")
                 .httpOnly(true)
                 .secure(isHttps(request))
-                .sameSite("Lax")
+                .sameSite("Strict")
                 .path("/api/users")
                 .maxAge(Duration.ZERO)
                 .build();

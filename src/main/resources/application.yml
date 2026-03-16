@@ -1,6 +1,10 @@
 spring:
   application:
     name: friends_bet
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
 jwt:
   # Base64-encoded HS256 secret (do not commit the secret value).
   secret: ${JWT_SECRET_B64}

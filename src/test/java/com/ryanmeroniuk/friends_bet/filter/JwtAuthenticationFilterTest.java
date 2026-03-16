@@ -1,5 +1,6 @@
 package com.ryanmeroniuk.friends_bet.filter;
 
+import com.ryanmeroniuk.friends_bet.service.TokenDenyListService;
 import com.ryanmeroniuk.friends_bet.service.UserDetailsService;
 import com.ryanmeroniuk.friends_bet.util.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -30,11 +31,14 @@ class JwtAuthenticationFilterTest {
     @Mock
     private UserDetailsService userDetailsService;
 
+    @Mock
+    private TokenDenyListService tokenDenyList;
+
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(jwtUtil, userDetailsService);
+        filter = new JwtAuthenticationFilter(jwtUtil, userDetailsService, tokenDenyList);
         SecurityContextHolder.clearContext();
     }
 

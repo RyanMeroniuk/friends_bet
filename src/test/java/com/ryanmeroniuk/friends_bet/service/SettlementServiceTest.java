@@ -55,7 +55,7 @@ class SettlementServiceTest {
     @BeforeEach
     void stubs() {
         when(betRepo.save(any(Bet.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(walletService.deposit(any(), any())).thenAnswer(invocation -> {
+        when(walletService.deposit(any(), any(), any())).thenAnswer(invocation -> {
             WalletDepositRequest req = invocation.getArgument(1);
             return new WalletResponse(req.getUserId(), req.getAmountCents());
         });
@@ -85,7 +85,8 @@ class SettlementServiceTest {
         assertNotNull(bet.getResolvedAt());
 
         verify(walletService).deposit(eq(GROUP_ID),
-                argThat(req -> proposer.equals(req.getUserId()) && req.getAmountCents() == 1_500L));
+                argThat(req -> proposer.equals(req.getUserId()) && req.getAmountCents() == 1_500L),
+                eq("BET_WIN"));
         verifyNoMoreInteractions(walletService);
     }
 
@@ -111,7 +112,7 @@ class SettlementServiceTest {
         assertEquals(800L, settlement.get("refundedAcceptorCents"));
 
         ArgumentCaptor<WalletDepositRequest> captor = ArgumentCaptor.forClass(WalletDepositRequest.class);
-        verify(walletService, times(2)).deposit(eq(GROUP_ID), captor.capture());
+        verify(walletService, times(2)).deposit(eq(GROUP_ID), captor.capture(), eq("BET_REFUND"));
         List<WalletDepositRequest> deposits = captor.getAllValues();
         assertTrue(deposits.stream().anyMatch(req -> proposer.equals(req.getUserId()) && req.getAmountCents() == 2_000L));
         assertTrue(deposits.stream().anyMatch(req -> acceptor.equals(req.getUserId()) && req.getAmountCents() == 800L));
@@ -160,7 +161,8 @@ class SettlementServiceTest {
         assertEquals(4_200L, settlement.get("payoutCents"));
 
         verify(walletService).deposit(eq(GROUP_ID),
-                argThat(req -> acceptor.equals(req.getUserId()) && req.getAmountCents() == 4_200L));
+                argThat(req -> acceptor.equals(req.getUserId()) && req.getAmountCents() == 4_200L),
+                eq("BET_WIN"));
     }
 
     @Test
@@ -184,7 +186,8 @@ class SettlementServiceTest {
         assertEquals("No counterparty; void.", settlement.get("note"));
 
         verify(walletService).deposit(eq(GROUP_ID),
-                argThat(req -> proposer.equals(req.getUserId()) && req.getAmountCents() == 900L));
+                argThat(req -> proposer.equals(req.getUserId()) && req.getAmountCents() == 900L),
+                eq("BET_REFUND"));
         verifyNoMoreInteractions(walletService);
     }
 

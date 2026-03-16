@@ -1,5 +1,6 @@
 package com.ryanmeroniuk.friends_bet.filter;
 
+import com.ryanmeroniuk.friends_bet.service.TokenDenyListService;
 import com.ryanmeroniuk.friends_bet.service.UserDetailsService;
 import com.ryanmeroniuk.friends_bet.util.JwtUtil;
 import io.jsonwebtoken.Claims;
@@ -19,11 +20,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private final TokenDenyListService tokenDenyList;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
-                                   UserDetailsService uds) {
+                                   UserDetailsService uds,
+                                   TokenDenyListService tokenDenyList) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = uds;
+        this.tokenDenyList = tokenDenyList;
     }
 
     @Override
@@ -49,6 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtUtil.parseAndValidate(token);
                 String tokenType = claims.get("token_type", String.class);
                 if (!"access".equals(tokenType)) {
+                    chain.doFilter(req, res);
+                    return;
+                }
+
+                // Reject denied (logged-out) access tokens
+                String jti = claims.getId();
+                if (jti != null && tokenDenyList.isDenied(jti)) {
                     chain.doFilter(req, res);
                     return;
                 }

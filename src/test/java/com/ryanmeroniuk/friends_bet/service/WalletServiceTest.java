@@ -9,6 +9,7 @@ import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletRepository;
+import com.ryanmeroniuk.friends_bet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +42,9 @@ class WalletServiceTest {
 
     @Mock
     private GroupMemberRepository groupMemberRepo;
+
+    @Mock
+    private WalletTransactionRepository txnRepo;
 
     @InjectMocks
     private WalletService walletService;

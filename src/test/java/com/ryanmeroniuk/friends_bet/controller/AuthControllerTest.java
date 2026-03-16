@@ -37,7 +37,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class, AdminSecretFilter.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, AdminSecretFilter.class,
+        com.ryanmeroniuk.friends_bet.filter.RateLimitFilter.class,
+        com.ryanmeroniuk.friends_bet.service.TokenDenyListService.class})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerTest {

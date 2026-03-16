@@ -60,6 +60,10 @@ public class GroupMemberService {
      * Join a group by invite code.
      */
     public GroupMemberResponse joinGroup(String inviteCode, JoinGroupRequest req) {
+        // Override userId with authenticated user to prevent joining on behalf of others
+        UUID authUserId = currentUserId();
+        req.setUserId(authUserId);
+
         Group group = groupRepo.findByInviteCode(inviteCode)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid invite code"));
 

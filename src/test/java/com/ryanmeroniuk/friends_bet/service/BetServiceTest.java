@@ -114,7 +114,7 @@ class BetServiceTest {
         assertThat(response.status()).isEqualTo("OPEN");
 
         ArgumentCaptor<WalletDepositRequest> walletCaptor = ArgumentCaptor.forClass(WalletDepositRequest.class);
-        verify(walletService).deposit(eq(groupId), walletCaptor.capture());
+        verify(walletService).deposit(eq(groupId), walletCaptor.capture(), eq("BET_PROPOSE"));
         assertThat(walletCaptor.getValue().getUserId()).isEqualTo(proposerId);
         assertThat(walletCaptor.getValue().getAmountCents()).isEqualTo(-amountCents);
 
@@ -154,7 +154,7 @@ class BetServiceTest {
 
         long expectedStake = 3_700;
         ArgumentCaptor<WalletDepositRequest> walletCaptor = ArgumentCaptor.forClass(WalletDepositRequest.class);
-        verify(walletService).deposit(eq(groupId), walletCaptor.capture());
+        verify(walletService).deposit(eq(groupId), walletCaptor.capture(), eq("BET_ACCEPT"));
         WalletDepositRequest debit = walletCaptor.getValue();
         assertThat(debit.getUserId()).isEqualTo(acceptorId);
         assertThat(debit.getAmountCents()).isEqualTo(-expectedStake);
@@ -190,7 +190,7 @@ class BetServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Proposer cannot accept own bet");
 
-        verify(walletService, never()).deposit(any(), any());
+        verify(walletService, never()).deposit(any(), any(), any());
         assertThat(bet.getStatus()).isEqualTo("OPEN");
     }
 

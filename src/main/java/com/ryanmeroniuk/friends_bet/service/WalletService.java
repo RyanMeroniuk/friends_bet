@@ -5,10 +5,12 @@ import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
 import com.ryanmeroniuk.friends_bet.model.Group;
 import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.model.Wallet;
+import com.ryanmeroniuk.friends_bet.model.WalletTransaction;
 import com.ryanmeroniuk.friends_bet.repository.GroupMemberRepository;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletRepository;
+import com.ryanmeroniuk.friends_bet.repository.WalletTransactionRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,22 +25,26 @@ public class WalletService {
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
     private final GroupMemberRepository groupMemberRepo;
+    private final WalletTransactionRepository txnRepo;
 
     public WalletService(WalletRepository walletRepo,
                          GroupRepository groupRepo,
                          UserRepository userRepo,
-                         GroupMemberRepository groupMemberRepo) {
+                         GroupMemberRepository groupMemberRepo,
+                         WalletTransactionRepository txnRepo) {
         this.walletRepo = walletRepo;
         this.groupRepo = groupRepo;
         this.userRepo = userRepo;
         this.groupMemberRepo = groupMemberRepo;
+        this.txnRepo = txnRepo;
     }
 
     /**
      * Deposit amount into a user's wallet for a given group.
+     * @param reason transaction type for audit: DEPOSIT, WITHDRAWAL, BET_PROPOSE, BET_ACCEPT, BET_WIN, BET_REFUND
      */
     @Transactional
-    public WalletResponse deposit(UUID groupId, WalletDepositRequest req) {
+    public WalletResponse deposit(UUID groupId, WalletDepositRequest req, String reason) {
         Group group = groupRepo.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
@@ -49,14 +55,24 @@ public class WalletService {
         Wallet w = walletRepo.findByGroupAndUserForUpdate(group, user)
                 .orElseGet(() -> walletRepo.save(new Wallet(group, user)));
 
-        long newBalance = w.getBalanceCents() + req.getAmountCents();
+        long balanceBefore = w.getBalanceCents();
+        long newBalance = balanceBefore + req.getAmountCents();
         if (newBalance < 0) {
             throw new IllegalArgumentException("Insufficient funds");
         }
         w.setBalanceCents(newBalance);
         Wallet saved = walletRepo.save(w);
 
+        txnRepo.save(new WalletTransaction(saved, req.getAmountCents(), balanceBefore, newBalance, reason));
+
         return new WalletResponse(saved.getUser().getId(), saved.getBalanceCents());
+    }
+
+    /** Convenience overload — defaults reason to DEPOSIT or WITHDRAWAL based on sign. */
+    @Transactional
+    public WalletResponse deposit(UUID groupId, WalletDepositRequest req) {
+        String reason = req.getAmountCents() >= 0 ? "DEPOSIT" : "WITHDRAWAL";
+        return deposit(groupId, req, reason);
     }
 
     /**

@@ -27,6 +27,8 @@ import java.util.UUID;
 
 @Service
 public class BetService {
+    private static final Set<String> SETTLEABLE_MARKETS = Set.of("WINNER", "SPREAD", "TOTALS");
+
     private final BetRepository betRepo;
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
@@ -92,6 +94,9 @@ public class BetService {
 
         // 2) Normalize inputs
         String market = normalizeMarket(req.getMarketType());
+        if (!SETTLEABLE_MARKETS.contains(market)) {
+            throw new IllegalArgumentException("Unsupported market type: " + market);
+        }
         String pick   = (req.getPick() == null) ? "" : req.getPick().trim().toUpperCase();
 
         // 3) Ensure funds & escrow proposer stake (debit)
@@ -101,7 +106,8 @@ public class BetService {
 
         walletService.deposit(
                 req.getGroupId(),
-                new WalletDepositRequest(req.getProposerId(), -req.getAmountCents())
+                new WalletDepositRequest(req.getProposerId(), -req.getAmountCents()),
+                "BET_PROPOSE"
         );
 
         // 4) Persist bet
@@ -155,7 +161,8 @@ public class BetService {
 
         walletService.deposit(
                 bet.getGroupId(),
-                new WalletDepositRequest(actor, -acceptorStake)
+                new WalletDepositRequest(actor, -acceptorStake),
+                "BET_ACCEPT"
         );
 
         bet.setAcceptorId(actor);

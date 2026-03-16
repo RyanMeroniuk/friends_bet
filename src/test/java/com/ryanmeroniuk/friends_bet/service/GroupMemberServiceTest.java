@@ -48,12 +48,19 @@ class GroupMemberServiceTest {
         SecurityContextHolder.clearContext();
     }
 
+    private void setAuthUser(User user) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user.getUsername(), null, List.of()));
+        when(userRepo.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+    }
+
     @Test
     void joinGroup_success() {
         String inviteCode = "abc12345";
         UUID userId = UUID.randomUUID();
         Group group = new Group("Test Group");
         User user = buildUser(userId, "alice");
+        setAuthUser(user);
 
         when(groupRepo.findByInviteCode(inviteCode)).thenReturn(Optional.of(group));
         when(userRepo.findById(userId)).thenReturn(Optional.of(user));
@@ -61,7 +68,6 @@ class GroupMemberServiceTest {
         when(memberRepo.save(any(GroupMember.class))).thenAnswer(inv -> inv.getArgument(0));
 
         JoinGroupRequest req = new JoinGroupRequest();
-        req.setUserId(userId);
 
         GroupMemberResponse response = groupMemberService.joinGroup(inviteCode, req);
 
@@ -73,10 +79,12 @@ class GroupMemberServiceTest {
 
     @Test
     void joinGroup_invalidInviteCode_throws() {
+        User user = buildUser(UUID.randomUUID(), "alice");
+        setAuthUser(user);
+
         when(groupRepo.findByInviteCode("bad-code")).thenReturn(Optional.empty());
 
         JoinGroupRequest req = new JoinGroupRequest();
-        req.setUserId(UUID.randomUUID());
 
         assertThatThrownBy(() -> groupMemberService.joinGroup("bad-code", req))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -89,12 +97,13 @@ class GroupMemberServiceTest {
     void joinGroup_userNotFound_throws() {
         UUID userId = UUID.randomUUID();
         Group group = new Group("Test Group");
+        User user = buildUser(userId, "alice");
+        setAuthUser(user);
 
         when(groupRepo.findByInviteCode("abc12345")).thenReturn(Optional.of(group));
         when(userRepo.findById(userId)).thenReturn(Optional.empty());
 
         JoinGroupRequest req = new JoinGroupRequest();
-        req.setUserId(userId);
 
         assertThatThrownBy(() -> groupMemberService.joinGroup("abc12345", req))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -108,6 +117,7 @@ class GroupMemberServiceTest {
         UUID userId = UUID.randomUUID();
         Group group = new Group("Test Group");
         User user = buildUser(userId, "alice");
+        setAuthUser(user);
         GroupMember existing = new GroupMember(group, user);
 
         when(groupRepo.findByInviteCode("abc12345")).thenReturn(Optional.of(group));
@@ -115,7 +125,6 @@ class GroupMemberServiceTest {
         when(memberRepo.findByGroupAndUser(group, user)).thenReturn(Optional.of(existing));
 
         JoinGroupRequest req = new JoinGroupRequest();
-        req.setUserId(userId);
 
         assertThatThrownBy(() -> groupMemberService.joinGroup("abc12345", req))
                 .isInstanceOf(IllegalArgumentException.class)

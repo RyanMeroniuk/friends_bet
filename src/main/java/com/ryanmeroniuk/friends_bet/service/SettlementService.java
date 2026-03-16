@@ -79,7 +79,7 @@ public class SettlementService {
 
             if (acceptor == null) {
                 // Defensive: refund proposer if somehow ACCEPTED without a counterparty
-                walletService.deposit(groupId, new WalletDepositRequest(proposer, proposerStake));
+                walletService.deposit(groupId, new WalletDepositRequest(proposer, proposerStake), "BET_REFUND");
                 b.setStatus(STATUS_VOID);
                 upsertSettlementDetails(b, g, outcome, null, null, 0, 0, proposerStake, 0, "No counterparty; void.");
                 finalizeAndSave(b);
@@ -90,18 +90,18 @@ public class SettlementService {
             switch (outcome) {
                 case PUSH -> {
                     // Refund both sides
-                    walletService.deposit(groupId, new WalletDepositRequest(proposer, proposerStake));
-                    walletService.deposit(groupId, new WalletDepositRequest(acceptor, acceptorStake));
+                    walletService.deposit(groupId, new WalletDepositRequest(proposer, proposerStake), "BET_REFUND");
+                    walletService.deposit(groupId, new WalletDepositRequest(acceptor, acceptorStake), "BET_REFUND");
                     b.setStatus(STATUS_VOID);
                     upsertSettlementDetails(b, g, outcome, null, null, 0, poolCents, proposerStake, acceptorStake, "Push: no winner.");
                 }
                 case PROPOSER_WIN -> {
-                    walletService.deposit(groupId, new WalletDepositRequest(proposer, poolCents));
+                    walletService.deposit(groupId, new WalletDepositRequest(proposer, poolCents), "BET_WIN");
                     b.setStatus(STATUS_RESOLVED);
                     upsertSettlementDetails(b, g, outcome, proposer, acceptor, poolCents, 0, 0, 0, null);
                 }
                 case ACCEPTOR_WIN -> {
-                    walletService.deposit(groupId, new WalletDepositRequest(acceptor, poolCents));
+                    walletService.deposit(groupId, new WalletDepositRequest(acceptor, poolCents), "BET_WIN");
                     b.setStatus(STATUS_RESOLVED);
                     upsertSettlementDetails(b, g, outcome, acceptor, proposer, poolCents, 0, 0, 0, null);
                 }
@@ -249,15 +249,7 @@ public class SettlementService {
     }
 
     private void finalizeAndSave(Bet b) {
-        safeSetResolvedAt(b, Instant.now());
+        b.setResolvedAt(Instant.now());
         betRepo.save(b);
-    }
-
-    private void safeSetResolvedAt(Bet b, Instant when) {
-        try {
-            var m = b.getClass().getMethod("setResolvedAt", Instant.class);
-            m.invoke(b, when);
-        } catch (Throwable ignored) {
-        }
     }
 }

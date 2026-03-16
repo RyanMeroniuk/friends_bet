@@ -39,9 +39,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(GroupController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class, AdminSecretFilter.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, AdminSecretFilter.class,
+        com.ryanmeroniuk.friends_bet.filter.RateLimitFilter.class,
+        com.ryanmeroniuk.friends_bet.service.TokenDenyListService.class})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@org.springframework.test.context.TestPropertySource(properties = "admin.secret=test-admin-secret")
 class GroupControllerTest {
 
     @Autowired
@@ -141,19 +144,27 @@ class GroupControllerTest {
     // ── List ──
 
     @Test
-    void list_200_returnsGroups() throws Exception {
+    void list_200_returnsGroups_adminOnly() throws Exception {
         List<GroupResponse> groups = List.of(
                 new GroupResponse(UUID.randomUUID(), "Group 1", "CODE1", Instant.now()),
                 new GroupResponse(UUID.randomUUID(), "Group 2", "CODE2", Instant.now())
         );
         when(groupService.listGroups()).thenReturn(groups);
 
-        mockMvc.perform(get("/api/groups")
-                        .header("Authorization", "Bearer " + accessToken))
+        mockMvc.perform(get("/api/admin/groups")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .header("X-Admin-Secret", "test-admin-secret"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].name").value("Group 1"))
                 .andExpect(jsonPath("$[1].name").value("Group 2"));
+    }
+
+    @Test
+    void list_403_withoutAdminSecret() throws Exception {
+        mockMvc.perform(get("/api/admin/groups")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden());
     }
 
     // ── List for user ──

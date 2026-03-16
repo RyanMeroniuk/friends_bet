@@ -34,8 +34,8 @@ public class GroupController {
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
-    /** List all groups (admin view) */
-    @GetMapping("/groups")
+    /** List all groups (admin only — requires X-Admin-Secret header) */
+    @GetMapping("/admin/groups")
     public List<GroupResponse> list() {
         return groupService.listGroups();
     }

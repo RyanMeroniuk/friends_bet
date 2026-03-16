@@ -151,6 +151,24 @@ class DtoValidationTest {
         assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("odds"));
     }
 
+    @Test
+    void CreateBetRequest_oddsBelow1_violation() {
+        CreateBetRequest req = validBetRequest();
+        req.setOdds(0.5);
+
+        Set<ConstraintViolation<CreateBetRequest>> violations = validator.validate(req);
+        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("odds"));
+    }
+
+    @Test
+    void CreateBetRequest_oddsExactly1_violation() {
+        CreateBetRequest req = validBetRequest();
+        req.setOdds(1.0);
+
+        Set<ConstraintViolation<CreateBetRequest>> violations = validator.validate(req);
+        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("odds"));
+    }
+
     // ── WalletDepositRequest ──
 
     @Test

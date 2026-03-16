@@ -7,6 +7,7 @@ import com.ryanmeroniuk.friends_bet.model.Wallet;
 import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletRepository;
+import com.ryanmeroniuk.friends_bet.repository.WalletTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,12 +41,16 @@ class WalletServiceConcurrencyTest {
     @Autowired
     private GroupRepository groupRepository;
 
+    @Autowired
+    private WalletTransactionRepository walletTransactionRepository;
+
     private Group testGroup;
     private User testUser;
 
     @BeforeEach
     void setUp() {
-        // Clean up any existing test data
+        // Clean up any existing test data (wallet_transactions before wallets due to FK)
+        walletTransactionRepository.deleteAll();
         walletRepository.deleteAll();
         groupRepository.deleteAll();
         userRepository.deleteAll();
