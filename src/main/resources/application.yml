@@ -1,13 +1,22 @@
 spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   application:
     name: friends_bet
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/friendsbet}
+    username: ${SPRING_DATASOURCE_USERNAME:friendsbet}
+    password: ${SPRING_DATASOURCE_PASSWORD:devpass}
+  jpa:
+    hibernate:
+      ddl-auto: validate
 server:
   error:
     include-stacktrace: never
     include-message: never
 jwt:
   # Base64-encoded HS256 secret (do not commit the secret value).
-  secret: ${JWT_SECRET_B64}
+  secret: ${JWT_SECRET_B64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3Q=}
 
 admin:
   # Optional: when set, required as `X-Admin-Secret` for `/api/admin/**`.
@@ -15,7 +24,7 @@ admin:
 
 odds:
   source: theoddsapi
-  apiKey: ${ODDS_API_KEY}
+  apiKey: ${ODDS_API_KEY:}
   regions: us
   markets: [h2h, spreads, totals]
   sport:
