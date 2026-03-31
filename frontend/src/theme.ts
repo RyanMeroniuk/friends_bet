@@ -1,43 +1,43 @@
 import { createTheme } from '@mui/material/styles';
 
-// Modern Slate & Steel Palette
+// BigStu Bets — Dark Theme
 const theme = createTheme({
     palette: {
-        mode: 'light',
-        primary: {
-            main: '#334155', // Slate 700 (Steel)
-            light: '#64748b', // Slate 500
-            dark: '#0f172a', // Slate 900
-            contrastText: '#ffffff',
-        },
-        secondary: {
-            main: '#94a3b8', // Slate 400
-            light: '#cbd5e1', // Slate 300
-            dark: '#475569', // Slate 600
-            contrastText: '#ffffff',
-        },
+        mode: 'dark',
         background: {
-            default: '#f8fafc', // Slate 50
-            paper: '#ffffff',
+            default: '#020617',  // --fb-bg-deep (Slate 950)
+            paper: '#0F172A',    // --fb-bg-surface (Slate 900)
         },
         text: {
-            primary: '#1e293b', // Slate 800
-            secondary: '#64748b', // Slate 500
+            primary: '#F8FAFC',   // --fb-text-primary (Slate 50)
+            secondary: '#94A3B8', // --fb-text-secondary (Slate 400)
+            disabled: '#64748B',  // --fb-text-muted (Slate 500)
         },
-        divider: '#e2e8f0', // Slate 200
+        primary: {
+            main: '#22C55E',  // --fb-accent (Emerald 500)
+            dark: '#16A34A',  // --fb-accent-dim (Emerald 600)
+            contrastText: '#ffffff',
+        },
+        error: { main: '#EF4444' },    // --fb-danger
+        warning: { main: '#F59E0B' },  // --fb-warning
+        info: { main: '#3B82F6' },     // --fb-info
+        divider: 'rgba(255,255,255,0.1)', // --fb-border
     },
     typography: {
-        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        h1: { fontWeight: 700, letterSpacing: '-0.02em' },
-        h2: { fontWeight: 700, letterSpacing: '-0.01em' },
-        h3: { fontWeight: 600 },
-        h4: { fontWeight: 600 },
-        h5: { fontWeight: 600 },
-        h6: { fontWeight: 600 },
-        button: { textTransform: 'none', fontWeight: 600 },
+        fontFamily: '"Space Mono", monospace',
+        h1: { fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const },
+        h2: { fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const },
+        h3: { fontWeight: 700, letterSpacing: '0.05em' },
+        h4: { fontWeight: 700, letterSpacing: '0.05em' },
+        h5: { fontWeight: 700 },
+        h6: { fontWeight: 700 },
+        body1: { fontWeight: 400 },
+        body2: { fontWeight: 400 },
+        caption: { fontWeight: 400, letterSpacing: '0.15em', textTransform: 'uppercase' as const },
+        button: { fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const },
     },
     shape: {
-        borderRadius: 16, // Modern rounded look
+        borderRadius: 16,
     },
     components: {
         MuiButton: {
@@ -47,22 +47,22 @@ const theme = createTheme({
                     boxShadow: 'none',
                     padding: '10px 20px',
                     '&:hover': {
-                        boxShadow: '0 4px 12px rgba(51, 65, 85, 0.15)',
-                        backgroundColor: '#1e293b',
+                        boxShadow: 'none',
                     },
                 },
                 containedPrimary: {
-                    backgroundColor: '#334155',
+                    backgroundColor: '#22C55E',
+                    color: '#ffffff',
                     '&:hover': {
-                        backgroundColor: '#1e293b',
+                        backgroundColor: '#16A34A',
                     },
                 },
                 outlined: {
-                    borderColor: '#e2e8f0',
-                    color: '#334155',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    color: '#F8FAFC',
                     '&:hover': {
-                        borderColor: '#cbd5e1',
-                        backgroundColor: '#f1f5f9',
+                        borderColor: 'rgba(255,255,255,0.2)',
+                        backgroundColor: 'rgba(255,255,255,0.05)',
                     },
                 },
             },
@@ -71,30 +71,28 @@ const theme = createTheme({
             styleOverrides: {
                 root: {
                     backgroundImage: 'none',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
-                },
-                elevation1: {
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                    backgroundColor: '#0F172A',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: 'none',
                 },
             },
         },
         MuiAppBar: {
             styleOverrides: {
                 root: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    backgroundColor: 'rgba(2,6,23,0.8)',
                     backdropFilter: 'blur(16px)',
-                    color: '#1e293b',
+                    color: '#F8FAFC',
                     boxShadow: 'none',
-                    borderBottom: '1px solid #e2e8f0',
+                    borderBottom: '1px solid rgba(255,255,255,0.1)',
                 },
             },
         },
         MuiDrawer: {
             styleOverrides: {
                 paper: {
-                    backgroundColor: '#f8fafc',
-                    borderRight: '1px solid #e2e8f0',
+                    backgroundColor: '#0F172A',
+                    borderRight: '1px solid rgba(255,255,255,0.1)',
                 },
             },
         },
@@ -104,14 +102,14 @@ const theme = createTheme({
                     borderRadius: 8,
                     margin: '4px 8px',
                     '&.Mui-selected': {
-                        backgroundColor: '#e2e8f0',
-                        color: '#0f172a',
+                        backgroundColor: '#1E293B', // Slate 800
+                        color: '#F8FAFC',
                         '&:hover': {
-                            backgroundColor: '#cbd5e1',
+                            backgroundColor: '#334155', // Slate 700
                         },
                     },
                     '&:hover': {
-                        backgroundColor: '#f1f5f9',
+                        backgroundColor: '#0F172A', // Slate 900
                     },
                 },
             },
