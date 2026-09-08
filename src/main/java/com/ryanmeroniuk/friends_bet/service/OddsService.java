@@ -11,19 +11,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class OddsService {
 
+    private static final Logger log = LoggerFactory.getLogger(OddsService.class);
+
     private final TheOddsApiClient client;
     private final GameRepository gameRepo;
     private final OddsQuoteRepository quoteRepo;
+
+    /** TTL cache: last successful refresh timestamp per sport key. */
+    private final ConcurrentHashMap<String, Instant> lastRefreshed = new ConcurrentHashMap<>();
 
     @Value("${odds.source:theoddsapi}")
     private String source;
@@ -32,9 +43,13 @@ public class OddsService {
     @Value("${odds.sport.nba:basketball_nba}")
     private String nbaSportKey;
 
-    /** NEW: comma-separated list of sport keys to refresh (e.g. baseball_mlb,basketball_nba,icehockey_nhl). */
+    /** Comma-separated list of sport keys to refresh. */
     @Value("${odds.sportKeys:}")
     private String configuredSportKeys;
+
+    /** Minimum interval between API calls for the same sport (milliseconds). */
+    @Value("${odds.refreshMillis:180000}")
+    private long refreshMillis;
 
     public OddsService(TheOddsApiClient client,
                        GameRepository gameRepo,
@@ -56,11 +71,20 @@ public class OddsService {
         return out;
     }
 
-    /** Manual trigger to refresh a sport key (e.g., NBA). */
+    /** Manual trigger to refresh a sport key (e.g., NBA). Skips if within TTL. */
     @Transactional
     public void refreshForSport(String sportKey) {
+        Instant last = lastRefreshed.get(sportKey);
+        if (last != null && Instant.now().toEpochMilli() - last.toEpochMilli() < refreshMillis) {
+            log.info("Skipping refresh for {} — cached (last refreshed {}s ago)",
+                    sportKey, (Instant.now().toEpochMilli() - last.toEpochMilli()) / 1000);
+            return;
+        }
+
         var events = client.fetchOdds(sportKey).block();
         if (events == null) return;
+        lastRefreshed.put(sportKey, Instant.now());
+        log.info("Refreshed odds for {} — {} events", sportKey, events.size());
 
         for (var ev : events) {
             // Upsert game using externalGameId = event.id
@@ -92,19 +116,34 @@ public class OddsService {
         }
     }
 
-    /** NEW: refresh all configured sports (ignores failures of individual sports). */
+    /** Refresh only sports with upcoming games or active bets. Falls back to all configured if DB is empty. */
     public void refreshAll() {
-        List<String> keys = sportKeys();
-        if (keys.isEmpty()) {
-            // fallback to legacy single-sport if none configured
+        List<String> configured = sportKeys();
+        if (configured.isEmpty()) {
             refreshForSport(nbaSportKey);
             return;
         }
-        for (String key : keys) {
+
+        // Smart refresh: only sports with upcoming games (3 days) or active bets
+        Instant now = Instant.now();
+        Instant horizon = now.plus(3, ChronoUnit.DAYS);
+        Set<String> active = new LinkedHashSet<>(gameRepo.findDistinctSportsWithGamesBetween(now, horizon));
+
+        // If DB has no upcoming games at all (first run), fall back to all configured
+        if (active.isEmpty()) {
+            active.addAll(configured);
+        }
+
+        // Only refresh sports that are actually configured
+        active.retainAll(new LinkedHashSet<>(configured));
+
+        log.info("Smart refresh: refreshing {} of {} configured sports: {}", active.size(), configured.size(), active);
+
+        for (String key : active) {
             try {
                 refreshForSport(key);
             } catch (Exception e) {
-                System.err.println("Refresh failed for sport " + key + ": " + e.getMessage());
+                log.warn("Refresh failed for sport {}: {}", key, e.getMessage());
             }
         }
     }

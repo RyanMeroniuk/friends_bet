@@ -198,11 +198,13 @@ export default function BetPage() {
   }
 
   async function handleRefresh() {
+    if (!selectedSport) { toast('Select a sport first', 'error'); return; }
     try {
-      await refreshSports(selectedSport || undefined);
+      await refreshSports(selectedSport);
       toast('Odds refreshed', 'success');
-    } catch {
-      toast('Failed to refresh', 'error');
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || 'Failed to refresh';
+      toast(msg, 'error');
     }
   }
 

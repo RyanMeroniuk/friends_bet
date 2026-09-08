@@ -23,6 +23,8 @@ admin:
   secret: ${ADMIN_SECRET:}
 
 odds:
+  warmup:
+    enabled: false
   source: theoddsapi
   apiKey: ${ODDS_API_KEY:}
   regions: us
@@ -31,4 +33,4 @@ odds:
     nba: basketball_nba
     nfl: americanfootball_nfl
   sportKeys: americanfootball_nfl,americanfootball_ncaaf,basketball_nba,basketball_ncaab,baseball_mlb,icehockey_nhl,soccer_epl,soccer_usa_mls,soccer_uefa_champs_league,soccer_spain_la_liga,mma_mixed_martial_arts,boxing_boxing
-  refreshMillis: 180000
+  refreshMillis: 3600000

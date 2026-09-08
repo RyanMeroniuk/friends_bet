@@ -19,7 +19,7 @@ management:
         include: health,info
 odds:
   sportKeys: americanfootball_nfl,americanfootball_ncaaf,basketball_nba,basketball_ncaab,baseball_mlb,icehockey_nhl,soccer_epl,soccer_usa_mls,soccer_uefa_champs_league,soccer_spain_la_liga,mma_mixed_martial_arts,boxing_boxing
-  refreshMillis: 180000
+  refreshMillis: 3600000
 scores:
   refreshMillis: 60000
   daysFrom: 3

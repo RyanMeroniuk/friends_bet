@@ -148,3 +148,7 @@
 {"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 2}, "timestamp": "2026-09-08T05:02:08.751544+00:00"}
 {"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-09-08T05:06:38.263728+00:00"}
 {"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 116}, "timestamp": "2026-09-08T05:06:38.263728+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 5, "successes": 5, "failures": 0, "metrics": {"edits_notified": 5, "reindexes_triggered": 0}, "timestamp": "2026-09-08T05:22:05.049856+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 3, "successes": 3, "failures": 0, "metrics": {"edits_notified": 3, "reindexes_triggered": 0}, "timestamp": "2026-09-08T05:22:37.538171+00:00"}
+{"hook_name": "edit-context-inject", "invocations": 2, "successes": 2, "failures": 0, "metrics": {"edits_processed": 2, "symbols_shown": 16}, "timestamp": "2026-09-08T05:22:37.538171+00:00"}
+{"hook_name": "post-edit-notify", "invocations": 5, "successes": 5, "failures": 0, "metrics": {"edits_notified": 5, "reindexes_triggered": 0}, "timestamp": "2026-09-08T05:24:33.452538+00:00"}
