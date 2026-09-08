@@ -30,5 +30,5 @@ odds:
   sport:
     nba: basketball_nba
     nfl: americanfootball_nfl
-  sportKeys: basketball_nba,americanfootball_nfl,baseball_mlb,icehockey_nhl
+  sportKeys: americanfootball_nfl,americanfootball_ncaaf,basketball_nba,basketball_ncaab,baseball_mlb,icehockey_nhl,soccer_epl,soccer_usa_mls,soccer_uefa_champs_league,soccer_spain_la_liga,mma_mixed_martial_arts,boxing_boxing
   refreshMillis: 180000

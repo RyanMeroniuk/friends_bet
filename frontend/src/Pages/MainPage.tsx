@@ -1,143 +1,53 @@
-// frontend/src/Pages/MainPage.tsx
-import React from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemText,
-  Toolbar,
-  Typography,
-  AppBar,
-  GlobalStyles,
-  Button,
-} from '@mui/material';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styles/ui.css';
+
+const NAV = [
+  { to: '/dashboard/groups', label: 'Groups' },
+  { to: '/dashboard/bets', label: 'Bets' },
+  { to: '/dashboard/wallets', label: 'Wallet' },
+];
 
 export default function MainPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  if (!user) return null;
 
   const handleLogout = async () => {
     await logout();
     navigate('/auth');
   };
 
-  const copyId = async () => {
-    if (!user?.id) return;
-    try { await navigator.clipboard.writeText(user.id); } catch {}
-  };
-
-  if (!user) return <div style={{ padding: '2rem' }}>Loading user…</div>;
-
-  const drawerWidth = 240;
-
   return (
-    <Box sx={{ display: 'flex' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--fb-bg)' }}>
+      <nav className="fb-nav">
+        <Link to="/dashboard/groups" className="fb-nav-logo">FriendsBet</Link>
 
-
-      <AppBar
-        position="fixed"
-        sx={{
-          zIndex: (t) => t.zIndex.drawer + 1,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-        }}
-      >
-        <Toolbar
-          sx={{
-            width: '100%',
-            gap: 0.75,
-            minHeight: { xs: 56, sm: 64 },
-            pl: { xs: 1, sm: 2 },
-            pr: { xs: 1.75, sm: 2.75 }, // keep right cluster in view with slight inset
-            justifyContent: 'space-between',
-          }}
-        >
-          <Typography variant="h5" sx={{ mr: 2, flexShrink: 0, fontWeight: 800, letterSpacing: '-0.02em', background: 'linear-gradient(45deg, #2563eb, #06b6d4)', backgroundClip: 'text', textFillColor: 'transparent', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            BigStu Bets
-          </Typography>
-
-          {/* Right cluster — anchored right with slight inset so buttons stay visible */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,                 // tighter gap
-              minWidth: 0,
-              maxWidth: { xs: '70vw', sm: '60vw', md: '50vw' }, // guard against overflow
-              overflow: 'hidden',
-              mr: { xs: 1.5, sm: 2.5 }, // keep cluster away from screen edge
-            }}
-          >
-            <Box sx={{ textAlign: 'right', mr: 2, display: { xs: 'none', sm: 'block' } }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                {user.username}
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {user.email}
-              </Typography>
-            </Box>
-
-            {/* Actions — always visible */}
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={copyId}
-              sx={{
-                borderColor: 'divider',
-                color: 'text.primary',
-                '&:hover': { borderColor: 'primary.main', background: 'transparent' },
-                flexShrink: 0,
-              }}
+        <div className="fb-nav-links">
+          {NAV.map((n) => (
+            <Link
+              key={n.to}
+              to={n.to}
+              className={`fb-nav-link${pathname.startsWith(n.to) ? ' fb-nav-link--active' : ''}`}
             >
-              Copy ID
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={handleLogout}
-              color="primary"
-              sx={{
-                flexShrink: 0,
-                boxShadow: 'none',
-              }}
-            >
-              Logout
-            </Button>
-          </Box>
-        </Toolbar>
-      </AppBar>
+              {n.label}
+            </Link>
+          ))}
+        </div>
 
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            mt: { xs: 7, sm: 8 }, // below app bar
-          },
-        }}
-      >
-        <List sx={{ px: 2 }}>
-          <ListItemButton component={Link} to="/dashboard/groups" sx={{ borderRadius: 2, mb: 1 }}>
-            <ListItemText primary="Groups" primaryTypographyProps={{ fontWeight: 500 }} />
-          </ListItemButton>
-          <ListItemButton component={Link} to="/dashboard/wallets" sx={{ borderRadius: 2, mb: 1 }}>
-            <ListItemText primary="Wallets" primaryTypographyProps={{ fontWeight: 500 }} />
-          </ListItemButton>
-          <ListItemButton component={Link} to="/dashboard/bets" sx={{ borderRadius: 2, mb: 1 }}>
-            <ListItemText primary="Bets" primaryTypographyProps={{ fontWeight: 500 }} />
-          </ListItemButton>
-        </List>
-      </Drawer>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 13, color: 'var(--fb-muted)' }}>{user.username}</span>
+          <button className="fb-btn fb-btn--ghost fb-btn--sm" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
+      </nav>
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}>
-        <Toolbar />
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
         <Outlet />
-      </Box>
-    </Box>
+      </main>
+    </div>
   );
 }

@@ -28,6 +28,11 @@
   --fb-warning: #F59E0B;       /* Amber 500 */
   --fb-info: #3B82F6;          /* Blue 500 */
 
+  /* Shorthand aliases */
+  --fb-text: var(--fb-text-primary);
+  --fb-muted: var(--fb-text-muted);
+  --fb-bg: var(--fb-bg-deep);
+
   /* Shared */
   --fb-radius: 12px;
   --fb-focus: 0 0 0 4px rgba(34, 197, 94, 0.3); /* Emerald focus ring */
@@ -138,13 +143,18 @@ body {
 .fb-select {
   width: 100%;
   background: var(--fb-bg-input);
+  color: var(--fb-text-primary);
   border: 1px solid var(--fb-border);
   border-radius: var(--fb-radius);
   padding: 12px 14px;
-  /* More padding */
   font-size: 14px;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.fb-select option {
+  background: var(--fb-bg-surface);
+  color: var(--fb-text-primary);
 }
 
 .fb-input::placeholder {

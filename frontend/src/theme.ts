@@ -24,7 +24,7 @@ const theme = createTheme({
         divider: 'rgba(255,255,255,0.1)', // --fb-border
     },
     typography: {
-        fontFamily: '"Space Mono", monospace',
+        fontFamily: '"Inter", sans-serif',
         h1: { fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const },
         h2: { fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const },
         h3: { fontWeight: 700, letterSpacing: '0.05em' },
