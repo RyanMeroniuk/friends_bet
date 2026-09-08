@@ -7,6 +7,7 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/friendsbet}
     username: ${SPRING_DATASOURCE_USERNAME:friendsbet}
     password: ${SPRING_DATASOURCE_PASSWORD:devpass}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: validate
