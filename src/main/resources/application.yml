@@ -11,6 +11,7 @@ spring:
     hibernate:
       ddl-auto: validate
 server:
+  port: ${PORT:8080}
   error:
     include-stacktrace: never
     include-message: never
