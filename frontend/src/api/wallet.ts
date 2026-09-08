@@ -35,3 +35,30 @@ export async function getMyBalance(
   const me = all.find(w => w.userId === currentUserId);
   return me ? me.balanceCents : 0;
 }
+
+/** Get total escrowed (pending) bet amount for current user in a group */
+export async function getPendingBets(groupId: string): Promise<number> {
+  const resp = await api.get<{ pendingCents: number }>(
+    `/api/groups/${groupId}/wallets/pending`
+  );
+  return resp.data.pendingCents;
+}
+
+export interface WalletTransactionResponse {
+  id: string;
+  amountCents: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  transactionType: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  createdAt: string;
+}
+
+/** Get transaction history for the current user in a group */
+export async function getTransactions(groupId: string): Promise<WalletTransactionResponse[]> {
+  const resp = await api.get<WalletTransactionResponse[]>(
+    `/api/groups/${groupId}/wallets/transactions`
+  );
+  return resp.data;
+}

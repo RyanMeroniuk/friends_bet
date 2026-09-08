@@ -258,6 +258,38 @@ public class BetService {
         };
     }
 
+    /**
+     * Cancel an OPEN bet — only the proposer can cancel, and stake is refunded.
+     */
+    @Transactional
+    public BetResponse cancel(UUID betId) {
+        UUID actor = currentUserId();
+        Bet bet = betRepo.findByIdForUpdate(betId)
+                .orElseThrow(() -> new IllegalArgumentException("Bet not found"));
+
+        if (!"OPEN".equals(bet.getStatus())) {
+            throw new IllegalArgumentException("Only OPEN bets can be cancelled");
+        }
+        if (!actor.equals(bet.getProposerId())) {
+            throw new IllegalArgumentException("Only the proposer can cancel their bet");
+        }
+
+        // Refund proposer stake
+        walletService.deposit(
+                bet.getGroupId(),
+                new WalletDepositRequest(actor, bet.getAmountCents()),
+                "BET_REFUND"
+        );
+
+        bet.setStatus("VOID");
+        bet.setResolvedAt(Instant.now());
+        Map<String, Object> details = bet.getDetails() != null ? bet.getDetails() : new java.util.HashMap<>();
+        details.put("cancelledBy", actor.toString());
+        bet.setDetails(details);
+
+        return BetMapper.toResponse(betRepo.save(bet));
+    }
+
     private UUID currentUserId() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepo.findByUsername(username)

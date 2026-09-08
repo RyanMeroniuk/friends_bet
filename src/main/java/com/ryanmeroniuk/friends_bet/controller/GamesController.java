@@ -4,7 +4,9 @@ import com.ryanmeroniuk.friends_bet.dto.GameDto;
 import com.ryanmeroniuk.friends_bet.model.Game;
 import com.ryanmeroniuk.friends_bet.repository.GameRepository;
 import com.ryanmeroniuk.friends_bet.repository.OddsQuoteRepository;
+import com.ryanmeroniuk.friends_bet.service.OddsService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -18,13 +20,16 @@ public class GamesController {
 
     private final GameRepository gameRepo;
     private final OddsQuoteRepository quoteRepo;
+    private final OddsService oddsService;
     private final String configuredSportKeys;
 
     public GamesController(GameRepository gameRepo,
                            OddsQuoteRepository quoteRepo,
+                           OddsService oddsService,
                            @Value("${odds.sportKeys:}") String configuredSportKeys) {
         this.gameRepo = gameRepo;
         this.quoteRepo = quoteRepo;
+        this.oddsService = oddsService;
         this.configuredSportKeys = configuredSportKeys;
     }
 
@@ -92,6 +97,18 @@ public class GamesController {
 
     private static GameDto toDto(Game g) {
         return new GameDto(g.getId(), g.getSport(), g.getStartTime(), g.getHomeTeam(), g.getAwayTeam());
+    }
+
+    /** User-facing endpoint to refresh odds/games from external API. Requires JWT only. */
+    @PostMapping("/games/refresh")
+    public ResponseEntity<Map<String, Object>> refreshGames(
+            @RequestParam(defaultValue = "all") String sport) {
+        if ("all".equalsIgnoreCase(sport)) {
+            oddsService.refreshAll();
+        } else {
+            oddsService.refreshForSport(sport);
+        }
+        return ResponseEntity.ok(Map.of("status", "ok", "refreshed", sport));
     }
 
     private List<String> parseConfiguredSports() {

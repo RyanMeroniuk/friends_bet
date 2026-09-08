@@ -28,7 +28,7 @@ import TxnListSkeleton from '../components/TxnListSkeleton';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
 import { listMyGroups, GroupResponse } from '../api/group';
-import { getMyBalance, deposit as depositFunds } from '../api/wallet';
+import { getMyBalance, deposit as depositFunds, getTransactions, getPendingBets, WalletTransactionResponse } from '../api/wallet';
 
 type TxnItem = {
   id: string;
@@ -177,6 +177,54 @@ export default function WalletPage() {
     ? 'Enter an amount greater than $0'
     : undefined;
 
+  // Withdrawal modal state (mirrors deposit)
+  const [withdrawOpen, setWithdrawOpen] = React.useState(false);
+  const [withdrawAmount, setWithdrawAmount] = React.useState<string>('25');
+  const [withdrawSubmitting, setWithdrawSubmitting] = React.useState(false);
+  const parsedWithdraw = Number(withdrawAmount) || 0;
+  const parsedWithdrawCents = Math.round(parsedWithdraw * 100);
+  const withdrawInvalid = parsedWithdraw <= 0 || parsedWithdrawCents <= 0 || !selectedId || !currentUserId || parsedWithdraw > summary.current;
+  const withdrawDisabledReason = !selectedId
+    ? 'Select a group first'
+    : !currentUserId
+    ? 'Sign in to withdraw funds'
+    : parsedWithdraw <= 0
+    ? 'Enter an amount greater than $0'
+    : parsedWithdraw > summary.current
+    ? 'Insufficient balance'
+    : undefined;
+
+  function handleWithdraw(amountCents: number) {
+    if (amountCents <= 0) return;
+    setWithdrawAmount((amountCents / 100).toString());
+    setWithdrawOpen(true);
+  }
+
+  async function confirmWithdraw() {
+    if (withdrawInvalid || withdrawSubmitting || !selectedId || !currentUserId) return;
+    try {
+      setWithdrawSubmitting(true);
+      const amountCents = Math.max(0, parsedWithdrawCents);
+      if (amountCents <= 0) return;
+      const resp = await depositFunds(selectedId, currentUserId, -amountCents);
+      const updatedBalance = resp.balanceCents / 100;
+      setSummary((prev) => ({ current: updatedBalance, available: updatedBalance, pending: prev.pending }));
+      setGroups((prev) =>
+        prev.map((chip) =>
+          chip.id === selectedId ? { ...chip, balanceCents: resp.balanceCents } : chip
+        )
+      );
+      setLastRefreshed(Date.now());
+      void fetchTransactions();
+      setWithdrawOpen(false);
+      setWithdrawAmount('');
+    } catch (err) {
+      console.error('Failed to withdraw funds:', err);
+    } finally {
+      setWithdrawSubmitting(false);
+    }
+  }
+
   // Filters + search
   const [txnFilter, setTxnFilter] = React.useState<TxnFilter>('all');
   const [txnSearch, setTxnSearch] = React.useState<string>('');
@@ -201,17 +249,52 @@ export default function WalletPage() {
     return arr;
   }, [txns, txnFilter, txnSearch]);
 
+  const txnLabelMap: Record<string, string> = {
+    DEPOSIT: 'Deposit',
+    WITHDRAWAL: 'Withdrawal',
+    BET_PROPOSE: 'Bet placed',
+    BET_ACCEPT: 'Bet accepted',
+    BET_WIN: 'Winnings',
+    BET_REFUND: 'Bet refund',
+  };
+
+  function mapTxn(tx: WalletTransactionResponse): TxnItem {
+    return {
+      id: tx.id,
+      ts: new Date(tx.createdAt).getTime(),
+      label: txnLabelMap[tx.transactionType] ?? tx.transactionType,
+      amount: tx.amountCents / 100,
+    };
+  }
+
+  const fetchTransactions = React.useCallback(async () => {
+    if (!selectedId) return;
+    setLoadingTxns(true);
+    try {
+      const rawTxns = await getTransactions(selectedId);
+      setTxns(rawTxns.map(mapTxn));
+    } catch (err) {
+      console.error('Failed to load transactions:', err);
+    } finally {
+      setLoadingTxns(false);
+    }
+  }, [selectedId]);
+
   const fetchSummary = React.useCallback(async () => {
     if (!selectedId || !currentUserId) return false;
 
     setLoadingSummary(true);
     try {
-      const balanceCents = await getMyBalance(selectedId, currentUserId);
+      const [balanceCents, pendingCents] = await Promise.all([
+        getMyBalance(selectedId, currentUserId),
+        getPendingBets(selectedId),
+      ]);
       const balanceDollars = balanceCents / 100;
+      const pendingDollars = pendingCents / 100;
       setSummary({
         current: balanceDollars,
         available: balanceDollars,
-        pending: 0,
+        pending: pendingDollars,
       });
       setGroups((prev) =>
         prev.map((chip) =>
@@ -225,14 +308,14 @@ export default function WalletPage() {
       return false;
     } finally {
       setLoadingSummary(false);
-      setLoadingTxns(false);
     }
   }, [selectedId, currentUserId]);
 
   React.useEffect(() => {
     if (!selectedId || !currentUserId) return;
     void fetchSummary();
-  }, [fetchSummary, selectedId, currentUserId]);
+    void fetchTransactions();
+  }, [fetchSummary, fetchTransactions, selectedId, currentUserId]);
 
   const handleRefresh = React.useCallback(() => {
     if (!selectedId || !currentUserId) return;
@@ -264,15 +347,7 @@ export default function WalletPage() {
         )
       );
       setLastRefreshed(Date.now());
-      setTxns((prev) => [
-        {
-          id: `${resp.userId}_deposit_${Date.now()}`,
-          ts: Date.now(),
-          label: 'Deposit',
-          amount: amountDollars,
-        },
-        ...prev,
-      ]);
+      void fetchTransactions();
 
       setDepositOpen(false);
       setAmount('');
@@ -354,6 +429,15 @@ export default function WalletPage() {
               presets={[25, 50, 100]}
               ctaLabel="+ Deposit $0"
               onSubmit={handleDeposit}
+            />
+            <ActionPanel
+              title="Withdraw Funds"
+              helper={`Withdraw money from ${selectedName}`}
+              balanceHint={`Available: $${summary.current.toFixed(2)}`}
+              presets={[25, 50, 100]}
+              ctaLabel="- Withdraw $0"
+              ctaTone="ghost"
+              onSubmit={handleWithdraw}
             />
           </>
         )}
@@ -552,6 +636,71 @@ export default function WalletPage() {
               <span className="fb-kv__label">New current balance</span>
               <span className="fb-kv__value">
                 ${(summary.current + Math.max(0, parsedAmount)).toFixed(2)} (preview)
+              </span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Withdraw Modal */}
+      <Modal
+        open={withdrawOpen}
+        title="Confirm Withdrawal"
+        onClose={() => setWithdrawOpen(false)}
+        footer={
+          <>
+            <button
+              className="fb-btn fb-btn--ghost fb-btn--md"
+              onClick={() => setWithdrawOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="fb-btn fb-btn--primary fb-btn--md"
+              onClick={confirmWithdraw}
+              disabled={withdrawInvalid || withdrawSubmitting}
+              aria-busy={withdrawSubmitting}
+              title={
+                withdrawInvalid
+                  ? withdrawDisabledReason
+                  : withdrawSubmitting
+                  ? 'Processing withdrawal'
+                  : undefined
+              }
+            >
+              {withdrawSubmitting ? 'Processing…' : 'Confirm'}
+            </button>
+          </>
+        }
+      >
+        <div className="fb-ff">
+          <div className="fb-ff__helper">
+            You're about to withdraw funds from <b>{selectedName}</b>.
+          </div>
+
+          <label className="fb-ff__label" htmlFor="withdraw-amt">Amount</label>
+          <Input
+            id="withdraw-amt"
+            type="number"
+            min={0}
+            max={summary.current}
+            step="0.01"
+            value={withdrawAmount}
+            onChange={(e) => setWithdrawAmount(e.target.value)}
+            aria-invalid={withdrawInvalid}
+          />
+          {parsedWithdraw > summary.current && (
+            <div className="fb-ff__error">Exceeds available balance of ${summary.current.toFixed(2)}.</div>
+          )}
+          {parsedWithdraw <= 0 && withdrawAmount !== '' && (
+            <div className="fb-ff__error">Please enter an amount greater than $0.00.</div>
+          )}
+
+          <div className="fb-kv" style={{ marginTop: 8 }}>
+            <div className="fb-kv__row">
+              <span className="fb-kv__label">New balance</span>
+              <span className="fb-kv__value">
+                ${(summary.current - Math.max(0, parsedWithdraw)).toFixed(2)} (preview)
               </span>
             </div>
           </div>

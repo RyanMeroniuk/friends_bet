@@ -5,8 +5,10 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,9 +24,24 @@ public class JwtUtil {
     public JwtUtil(
             @Value("${jwt.secret}") String base64Secret,
             @Value("${jwt.issuer:friends-bet}") String issuer,
-            @Value("${jwt.audience:friends-bet-client}") String audience
+            @Value("${jwt.audience:friends-bet-client}") String audience,
+            Environment environment
     ) {
         byte[] secretBytes = Decoders.BASE64.decode(base64Secret);
+
+        // Fail fast if the committed test key is used outside dev/test profiles
+        byte[] testKey = "test-test-test-test-test-test-test-test-test"
+                .getBytes(StandardCharsets.UTF_8);
+        if (Arrays.equals(secretBytes, testKey)) {
+            boolean isDev = Arrays.stream(environment.getActiveProfiles())
+                    .anyMatch(p -> p.equals("dev") || p.equals("test") || p.equals("local"));
+            if (!isDev) {
+                throw new IllegalStateException(
+                        "JWT_SECRET_B64 must be set to a strong, unique secret in non-dev profiles. "
+                        + "The committed test key is not safe for production.");
+            }
+        }
+
         this.key = Keys.hmacShaKeyFor(secretBytes);
         this.issuer = issuer;
         this.audience = audience;

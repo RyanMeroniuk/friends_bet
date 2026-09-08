@@ -4,7 +4,7 @@ import { listBets, proposeBet, acceptBet, Bet } from '../api/bet';
 import { listGames, GameSummary } from '../api/game';
 import { Typography, TextField, MenuItem, ToggleButton, ToggleButtonGroup, InputAdornment, Stack, Box, Autocomplete } from '@mui/material';
 
-import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi } from '../api/bet';
+import { refreshSports, settleAcceptedBets as settleAcceptedBetsApi, cancelBet } from '../api/bet';
 import { useAuth } from '../context/AuthContext';
 
 import TwoColumn from '../components/TwoColumn';
@@ -344,6 +344,12 @@ export default function BetPage() {
     catch (e: any) { const msg = e.response?.data || 'Error accepting bet'; setError(msg); pushToast(msg, 'error'); }
   }
 
+  async function onCancel(betId: string) {
+    setMessage(null); setError(null);
+    try { await cancelBet(betId); pushToast('Bet cancelled — stake refunded.', 'success'); loadBets(); }
+    catch (e: any) { const msg = e.response?.data || 'Error cancelling bet'; setError(msg); pushToast(msg, 'error'); }
+  }
+
   async function refreshOddsAndGames() {
     try {
       setBusyRefresh(true); setMessage(null); setError(null);
@@ -548,8 +554,16 @@ export default function BetPage() {
           <div style={{ fontSize: 12, color: 'var(--fb-muted)' }}>
             {('createdAt' in b && (b as any).createdAt) ? new Date((b as any).createdAt).toLocaleString() : 'Active'}
           </div>
-          <div style={{ marginLeft: 'auto' }}>
-            {b.status === 'OPEN' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {b.status === 'OPEN' && b.proposerId === userId && (
+              <button
+                className="fb-btn fb-btn--ghost fb-btn--md"
+                onClick={(e) => { e.stopPropagation(); onCancel(b.id); }}
+              >
+                Cancel
+              </button>
+            )}
+            {b.status === 'OPEN' && b.proposerId !== userId && (
               <button
                 className="fb-btn fb-btn--primary fb-btn--md"
                 onClick={(e) => { e.stopPropagation(); onAccept(b.id); }}
@@ -950,7 +964,12 @@ export default function BetPage() {
                 Copy Bet ID
               </button>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                {selectedBet.status === 'OPEN' && (
+                {selectedBet.status === 'OPEN' && selectedBet.proposerId === userId && (
+                  <button className="fb-btn fb-btn--ghost fb-btn--md" onClick={() => onCancel(selectedBet.id)}>
+                    Cancel Bet
+                  </button>
+                )}
+                {selectedBet.status === 'OPEN' && selectedBet.proposerId !== userId && (
                   <button className="fb-btn fb-btn--primary fb-btn--md" onClick={() => onAccept(selectedBet.id)}>
                     Accept Bet
                   </button>

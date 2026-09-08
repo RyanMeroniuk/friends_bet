@@ -2,6 +2,7 @@ package com.ryanmeroniuk.friends_bet.service;
 
 import com.ryanmeroniuk.friends_bet.dto.WalletDepositRequest;
 import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
+import com.ryanmeroniuk.friends_bet.dto.WalletTransactionResponse;
 import com.ryanmeroniuk.friends_bet.model.Group;
 import com.ryanmeroniuk.friends_bet.model.User;
 import com.ryanmeroniuk.friends_bet.model.Wallet;
@@ -11,6 +12,7 @@ import com.ryanmeroniuk.friends_bet.repository.GroupRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletRepository;
 import com.ryanmeroniuk.friends_bet.repository.WalletTransactionRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +55,16 @@ public class WalletService {
 
         // Use pessimistic locking to prevent race conditions on concurrent deposits/withdrawals
         Wallet w = walletRepo.findByGroupAndUserForUpdate(group, user)
-                .orElseGet(() -> walletRepo.save(new Wallet(group, user)));
+                .orElseGet(() -> {
+                    try {
+                        return walletRepo.saveAndFlush(new Wallet(group, user));
+                    } catch (DataIntegrityViolationException e) {
+                        // Another thread created the wallet concurrently — re-fetch with lock
+                        return walletRepo.findByGroupAndUserForUpdate(group, user)
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "Wallet creation conflict: concurrent insert detected but wallet not found on retry"));
+                    }
+                });
 
         long balanceBefore = w.getBalanceCents();
         long newBalance = balanceBefore + req.getAmountCents();
@@ -92,6 +103,32 @@ public class WalletService {
                         w.getUser().getId(),
                         w.getBalanceCents()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Get transaction history for the current user's wallet in a group.
+     */
+    public List<WalletTransactionResponse> getTransactions(UUID groupId) {
+        Group group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        UUID actor = currentUserId();
+        User user = userRepo.findById(actor)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return walletRepo.findByGroupAndUser(group, user)
+                .map(wallet -> txnRepo.findAllByWalletOrderByCreatedAtDesc(wallet).stream()
+                        .map(tx -> new WalletTransactionResponse(
+                                tx.getId(),
+                                tx.getAmountCents(),
+                                tx.getBalanceBefore(),
+                                tx.getBalanceAfter(),
+                                tx.getTransactionType(),
+                                tx.getReferenceType(),
+                                tx.getReferenceId(),
+                                tx.getCreatedAt()))
+                        .toList())
+                .orElse(List.of());
     }
 
     private UUID currentUserId() {

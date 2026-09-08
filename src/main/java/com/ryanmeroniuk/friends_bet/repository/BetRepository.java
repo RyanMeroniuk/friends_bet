@@ -24,4 +24,12 @@ public interface BetRepository extends JpaRepository<Bet, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Bet b WHERE b.gameId = :gameId")
     List<Bet> findByGameIdForUpdate(@Param("gameId") UUID gameId);
+
+    @Query("SELECT COALESCE(SUM(b.amountCents), 0) FROM Bet b " +
+           "WHERE b.groupId = :groupId AND b.proposerId = :userId AND b.status IN ('OPEN','ACCEPTED')")
+    long sumProposerStakeByGroupAndUser(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
+
+    @Query("SELECT COALESCE(SUM(b.acceptorStakeCents), 0) FROM Bet b " +
+           "WHERE b.groupId = :groupId AND b.acceptorId = :userId AND b.status = 'ACCEPTED'")
+    long sumAcceptorStakeByGroupAndUser(@Param("groupId") UUID groupId, @Param("userId") UUID userId);
 }

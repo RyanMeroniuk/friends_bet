@@ -119,6 +119,19 @@ public class BetController {
     }
 
     /**
+     * Cancel an open bet (proposer only — refunds stake).
+     * POST /api/bets/{betId}/cancel
+     */
+    @PostMapping(
+            value = "/bets/{betId}/cancel",
+            produces = "application/json"
+    )
+    public ResponseEntity<BetResponse> cancelBet(@PathVariable UUID betId) {
+        BetResponse resp = betService.cancel(betId);
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
      * Handle invalid arguments (e.g. not found, already accepted).
      */
     @ExceptionHandler(IllegalArgumentException.class)
