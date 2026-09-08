@@ -95,10 +95,10 @@ export default function AuthPage() {
       {/* Brand */}
       <div style={{ marginBottom: 32, textAlign: 'center' }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: 'var(--fb-text)', margin: 0, letterSpacing: '-0.02em' }}>
-          FriendsBet
+          BigStu Bets
         </h1>
         <div style={{ fontSize: 13, color: 'var(--fb-muted)', marginTop: 4 }}>
-          Sports betting with your crew
+          Bet with your boys
         </div>
       </div>
 

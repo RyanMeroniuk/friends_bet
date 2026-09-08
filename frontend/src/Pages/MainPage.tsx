@@ -23,7 +23,7 @@ export default function MainPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--fb-bg)' }}>
       <nav className="fb-nav">
-        <Link to="/dashboard/groups" className="fb-nav-logo">FriendsBet</Link>
+        <Link to="/dashboard/groups" className="fb-nav-logo">BigStu Bets</Link>
 
         <div className="fb-nav-links">
           {NAV.map((n) => (
