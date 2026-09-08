@@ -13,7 +13,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Rate limits auth endpoints (login, register, refresh) per IP per minute.
@@ -24,7 +25,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private static final int MAX_BUCKETS = 10_000;
+
+    /** LRU-evicting map: oldest entries are removed when the map exceeds MAX_BUCKETS. */
+    @SuppressWarnings("serial")
+    private final Map<String, Bucket> buckets = new LinkedHashMap<>(128, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Bucket> eldest) {
+            return size() > MAX_BUCKETS;
+        }
+    };
+
     private final int requestsPerMinute;
 
     public RateLimitFilter(
@@ -45,8 +56,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String ip = resolveClientIp(request);
-        Bucket bucket = buckets.computeIfAbsent(ip, k -> createBucket());
+        String ip = request.getRemoteAddr();
+        Bucket bucket;
+        synchronized (buckets) {
+            bucket = buckets.computeIfAbsent(ip, k -> createBucket());
+        }
 
         if (bucket.tryConsume(1)) {
             filterChain.doFilter(request, response);
@@ -63,13 +77,5 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 .addLimit(limit -> limit.capacity(requestsPerMinute)
                         .refillGreedy(requestsPerMinute, Duration.ofMinutes(1)))
                 .build();
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

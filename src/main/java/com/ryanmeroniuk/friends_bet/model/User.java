@@ -32,6 +32,12 @@ public class User {
     @Column (nullable = false, updatable = false)
     private final Instant createdAt = Instant.now();
 
+    @Column(nullable = false)
+    private int failedAttempts = 0;
+
+    @Column
+    private Instant lockedUntil;
+
     // JPA (Hibernate) needs a constructor with no arguments.
     public User() {}
 
@@ -85,5 +91,15 @@ public class User {
     // Setter for user's password.
     public void setPasswordHash(String password) {
         this.passwordHash = password;
+    }
+
+    public int getFailedAttempts() { return failedAttempts; }
+    public void setFailedAttempts(int failedAttempts) { this.failedAttempts = failedAttempts; }
+
+    public Instant getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(Instant lockedUntil) { this.lockedUntil = lockedUntil; }
+
+    public boolean isLocked() {
+        return lockedUntil != null && Instant.now().isBefore(lockedUntil);
     }
 }

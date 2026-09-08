@@ -58,6 +58,8 @@ public class JwtUtil {
     public Claims parseAndValidate(String token) {
         Jws<Claims> claims = Jwts.parserBuilder()
                 .setSigningKey(key)
+                .requireIssuer(issuer)
+                .requireAudience(audience)
                 .build()
                 .parseClaimsJws(token);
         return claims.getBody();
