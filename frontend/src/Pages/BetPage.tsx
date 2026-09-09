@@ -11,7 +11,7 @@ import Modal from '../components/Modal';
 import { ToastContainer, ToastItem } from '../components/Toast';
 import '../styles/ui.css';
 
-const DAYS = 3;
+const DAYS = 7;
 
 const SPORT_LABELS: Record<string, string> = {
   americanfootball_nfl: 'NFL',
@@ -201,7 +201,24 @@ export default function BetPage() {
     if (!selectedSport) { toast('Select a sport first', 'error'); return; }
     try {
       await refreshSports(selectedSport);
-      toast('Odds refreshed', 'success');
+      // Reload sports and games after refresh
+      const sportsResp = await fetch(`/api/sports?days=${DAYS}`, { headers: { Accept: 'application/json' } });
+      if (sportsResp.ok) setSports(await sportsResp.json());
+      const gamesResp = await fetch(`/api/sports/${encodeURIComponent(selectedSport)}/games?days=${DAYS}`, { headers: { Accept: 'application/json' } });
+      if (gamesResp.ok) {
+        const list: any[] = await gamesResp.json();
+        const mapped: GameSummary[] = (list || []).map((g: any) => ({
+          id: g.id, homeTeam: g.homeTeam, awayTeam: g.awayTeam, startTime: g.startTime,
+        }));
+        setGames(mapped);
+        setGameLookup((prev) => {
+          const next = { ...prev };
+          mapped.forEach((g) => { next[g.id] = g; });
+          return next;
+        });
+        if (mapped.length > 0) setGameId(mapped[0].id);
+      }
+      toast(`Odds refreshed — ${games.length} games loaded`, 'success');
     } catch (e: any) {
       const msg = e?.response?.data?.error || 'Failed to refresh';
       toast(msg, 'error');
