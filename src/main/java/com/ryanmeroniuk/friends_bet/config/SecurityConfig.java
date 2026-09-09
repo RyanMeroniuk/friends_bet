@@ -92,6 +92,9 @@ public class SecurityConfig {
 
                     // Everything else under /api/** requires a valid access token
                     auth.requestMatchers("/api/**").authenticated();
+
+                    // Static files + SPA routes (React Router) are public
+                    auth.anyRequest().permitAll();
                 })
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(adminSecretFilter, UsernamePasswordAuthenticationFilter.class)
