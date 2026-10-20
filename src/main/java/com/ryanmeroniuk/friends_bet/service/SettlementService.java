@@ -151,13 +151,15 @@ public class SettlementService {
 
     private Outcome evaluateOutcome(Bet b, Game g) {
         String market = Optional.ofNullable(b.getMarketType()).orElse("").toUpperCase(Locale.ROOT);
-        String pick   = Optional.ofNullable(b.getPick()).orElse("").toUpperCase(Locale.ROOT);
+        // Resolve team-name picks (stored by older clients) to HOME/AWAY.
+        String pick   = Optional.ofNullable(BetPicks.canonical(market, b.getPick(), g)).orElse("");
 
         int home = g.getHomeScore();
         int away = g.getAwayScore();
 
         switch (market) {
             case "WINNER": {
+                if (!"HOME".equals(pick) && !"AWAY".equals(pick)) return Outcome.NEEDS_DATA;
                 if (home == away) return Outcome.PUSH; // ties => push
                 String actual = home > away ? "HOME" : "AWAY";
                 return actual.equals(pick) ? Outcome.PROPOSER_WIN : Outcome.ACCEPTOR_WIN;

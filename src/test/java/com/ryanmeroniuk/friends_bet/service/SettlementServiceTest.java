@@ -166,6 +166,67 @@ class SettlementServiceTest {
     }
 
     @Test
+    void settleGame_winnerMarket_teamNamePickSettlesAgainstThatTeam() {
+        UUID gameId = UUID.randomUUID();
+        UUID proposer = UUID.randomUUID();
+        UUID acceptor = UUID.randomUUID();
+
+        // Older clients stored the team name; the away team wins here.
+        Game game = finalGame(gameId, 20, 31);
+        Bet bet = acceptedBet(GROUP_ID, gameId, proposer, acceptor, "WINNER", "away_team",
+                1_000L, 500L, new HashMap<>());
+        mockGameAndBets(game, bet);
+
+        int settled = settlementService.settleGame(gameId);
+
+        assertEquals(1, settled);
+        assertEquals("PROPOSER_WIN", settlement(bet).get("outcome"));
+        verify(walletService).deposit(eq(GROUP_ID),
+                argThat(req -> proposer.equals(req.getUserId()) && req.getAmountCents() == 1_500L),
+                eq("BET_WIN"));
+    }
+
+    @Test
+    void settleGame_spread_teamNamePickAppliesSpreadToThatTeam() {
+        UUID gameId = UUID.randomUUID();
+        UUID proposer = UUID.randomUUID();
+        UUID acceptor = UUID.randomUUID();
+
+        Game game = finalGame(gameId, 27, 24); // home -3.5 => 23.5 vs 24, home fails to cover
+        Map<String, Object> details = new HashMap<>();
+        details.put("spreadPoints", -3.5);
+        Bet bet = acceptedBet(GROUP_ID, gameId, proposer, acceptor, "SPREAD", "HOME_TEAM",
+                1_500L, 600L, details);
+        mockGameAndBets(game, bet);
+
+        int settled = settlementService.settleGame(gameId);
+
+        assertEquals(1, settled);
+        assertEquals("ACCEPTOR_WIN", settlement(bet).get("outcome"));
+        verify(walletService).deposit(eq(GROUP_ID),
+                argThat(req -> acceptor.equals(req.getUserId()) && req.getAmountCents() == 2_100L),
+                eq("BET_WIN"));
+    }
+
+    @Test
+    void settleGame_winnerMarket_unknownPickIsNotSettled() {
+        UUID gameId = UUID.randomUUID();
+        UUID proposer = UUID.randomUUID();
+        UUID acceptor = UUID.randomUUID();
+
+        Game game = finalGame(gameId, 31, 20);
+        Bet bet = acceptedBet(GROUP_ID, gameId, proposer, acceptor, "WINNER", "SOME OTHER TEAM",
+                1_000L, 500L, new HashMap<>());
+        mockGameAndBets(game, bet);
+
+        int settled = settlementService.settleGame(gameId);
+
+        assertEquals(0, settled);
+        assertEquals("ACCEPTED", bet.getStatus());
+        verifyNoInteractions(walletService);
+    }
+
+    @Test
     void settleGame_voidsWithoutAcceptor() {
         UUID gameId = UUID.randomUUID();
         UUID proposer = UUID.randomUUID();

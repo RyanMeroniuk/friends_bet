@@ -127,6 +127,33 @@ class BetServiceTest {
     }
 
     @Test
+    void propose_maps_team_name_pick_to_side() {
+        UUID groupId = UUID.randomUUID();
+        UUID proposerId = UUID.randomUUID();
+        CreateBetRequest request = teamPickRequest(groupId, proposerId, "SPREAD", "Boston Celtics");
+
+        betService.propose(request);
+
+        ArgumentCaptor<Bet> betCaptor = ArgumentCaptor.forClass(Bet.class);
+        verify(betRepository).save(betCaptor.capture());
+        assertThat(betCaptor.getValue().getPick()).isEqualTo("AWAY");
+    }
+
+    @Test
+    void propose_rejects_pick_that_is_not_in_the_game() {
+        UUID groupId = UUID.randomUUID();
+        UUID proposerId = UUID.randomUUID();
+        CreateBetRequest request = teamPickRequest(groupId, proposerId, "WINNER", "Chicago Bulls");
+
+        assertThatThrownBy(() -> betService.propose(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid pick");
+
+        verify(walletService, never()).deposit(any(), any(), any());
+        verify(betRepository, never()).save(any(Bet.class));
+    }
+
+    @Test
     void accept_debits_acceptor_with_rounded_stake_and_sets_status() {
         UUID groupId = UUID.randomUUID();
         UUID betId = UUID.randomUUID();
@@ -192,6 +219,35 @@ class BetServiceTest {
 
         verify(walletService, never()).deposit(any(), any(), any());
         assertThat(bet.getStatus()).isEqualTo("OPEN");
+    }
+
+    /** Stubs a Lakers (home) vs Celtics (away) game and returns a bet request with the given pick. */
+    private CreateBetRequest teamPickRequest(UUID groupId, UUID proposerId, String market, String pick) {
+        UUID gameId = UUID.randomUUID();
+        CreateBetRequest request = new CreateBetRequest();
+        request.setGroupId(groupId);
+        request.setGameId(gameId);
+        request.setMarketType(market);
+        request.setPick(pick);
+        request.setAmountCents(1_000);
+        request.setOdds(1.9);
+
+        Game game = new Game("ext-" + gameId, "Los Angeles Lakers", "Boston Celtics",
+                Instant.now().plusSeconds(3_600));
+        game.setId(gameId);
+
+        User proposer = buildUser(proposerId, "proposer");
+        authenticate(proposer);
+
+        when(groupRepository.findById(groupId)).thenReturn(Optional.of(new Group("Team Pick Group")));
+        when(gameRepository.findById(gameId)).thenReturn(Optional.of(game));
+        when(groupMemberRepository.existsByGroup_IdAndUser_Id(groupId, proposerId)).thenReturn(true);
+        when(betRepository.save(any(Bet.class))).thenAnswer(invocation -> {
+            Bet bet = invocation.getArgument(0);
+            bet.setId(UUID.randomUUID());
+            return bet;
+        });
+        return request;
     }
 
     private void authenticate(User user) {

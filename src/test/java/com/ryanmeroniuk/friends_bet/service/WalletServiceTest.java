@@ -65,6 +65,8 @@ class WalletServiceTest {
         when(userRepo.findById(userId)).thenReturn(Optional.of(user));
         when(walletRepo.findByGroupAndUserForUpdate(group, user)).thenReturn(Optional.empty());
 
+        // New wallets are created with saveAndFlush so a concurrent insert surfaces immediately
+        when(walletRepo.saveAndFlush(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
         when(walletRepo.save(any(Wallet.class))).thenAnswer(inv -> inv.getArgument(0));
 
         WalletDepositRequest req = new WalletDepositRequest(userId, 5_000L);

@@ -97,7 +97,10 @@ public class BetService {
         if (!SETTLEABLE_MARKETS.contains(market)) {
             throw new IllegalArgumentException("Unsupported market type: " + market);
         }
-        String pick   = (req.getPick() == null) ? "" : req.getPick().trim().toUpperCase();
+        String pick = BetPicks.canonical(market, req.getPick(), game);
+        if (pick == null) {
+            throw new IllegalArgumentException("Invalid pick for " + market + ": " + req.getPick());
+        }
 
         // 3) Ensure funds & escrow proposer stake (debit)
         // If your WalletService already blocks negative balances inside deposit(), you can omit this check.

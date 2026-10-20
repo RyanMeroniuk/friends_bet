@@ -162,6 +162,14 @@ export default function BetPage() {
     return g ? `${g.awayTeam} @ ${g.homeTeam}` : gid.slice(0, 8);
   }
 
+  // picks are stored as HOME/AWAY; show the team name when the game is known
+  function pickLabel(gid: string, p: string) {
+    const g = gameLookup[gid];
+    if (g && p === 'HOME') return g.homeTeam;
+    if (g && p === 'AWAY') return g.awayTeam;
+    return p;
+  }
+
   // filtered bets
   const filtered = statusTab === 'all' ? bets : bets.filter((b) => b.status === statusTab);
 
@@ -326,7 +334,7 @@ export default function BetPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, fontSize: 13, color: 'var(--fb-muted)' }}>
                 <div><span style={{ color: 'var(--fb-text)' }}>{b.marketType}</span></div>
-                <div>Pick: <span style={{ color: 'var(--fb-text)' }}>{b.pick}</span></div>
+                <div>Pick: <span style={{ color: 'var(--fb-text)' }}>{pickLabel(b.gameId, b.pick)}</span></div>
                 <div>Stake: <span style={{ color: 'var(--fb-text)' }}>${(b.amountCents / 100).toFixed(2)}</span></div>
                 <div>Odds: <span style={{ color: 'var(--fb-text)' }}>{b.odds}</span></div>
               </div>
@@ -399,8 +407,8 @@ export default function BetPage() {
             ) : (
               <select className="fb-select" value={pick} onChange={(e) => setPick(e.target.value)}>
                 <option value="">Select…</option>
-                {selectedGame && <option value={selectedGame.homeTeam}>{selectedGame.homeTeam}</option>}
-                {selectedGame && <option value={selectedGame.awayTeam}>{selectedGame.awayTeam}</option>}
+                {selectedGame && <option value="HOME">{selectedGame.homeTeam}</option>}
+                {selectedGame && <option value="AWAY">{selectedGame.awayTeam}</option>}
               </select>
             )}
           </div>

@@ -6,6 +6,7 @@ import com.ryanmeroniuk.friends_bet.dto.WalletResponse;
 import com.ryanmeroniuk.friends_bet.config.SecurityConfig;
 import com.ryanmeroniuk.friends_bet.filter.AdminSecretFilter;
 import com.ryanmeroniuk.friends_bet.filter.JwtAuthenticationFilter;
+import com.ryanmeroniuk.friends_bet.repository.BetRepository;
 import com.ryanmeroniuk.friends_bet.repository.UserRepository;
 import com.ryanmeroniuk.friends_bet.service.UserDetailsService;
 import com.ryanmeroniuk.friends_bet.service.WalletService;
@@ -61,6 +62,9 @@ class WalletControllerTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @MockitoBean
+    private BetRepository betRepository;
 
     private String accessToken;
     private UUID authUserId;
