@@ -12,3 +12,19 @@ frontend/build/
 .env.local
 .env.*.local
 
+
+# Local-only: dev databases, editor settings, AI tooling and notes
+data/
+.idea/
+.vscode/
+.claude/
+thoughts/
+CLAUDE.md
+.mcp.json
+.tldr/
+.tldrignore
+HELP.md
+DatabaseStartup.txt*
+frontend/README.md
+frontend/DESIGN.md
+frontend/SETUP_PLAN.md

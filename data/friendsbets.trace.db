@@ -1,9 +1,0 @@
-2025-08-04 18:55:41.411782-06:00 jdbc[3]: exception
-org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
-select u1_0.id,u1_0.created_at,u1_0.email,u1_0.password_hash,u1_0.username from users u1_0 where u1_0.username=? [42104-232]
-2025-08-04 18:55:51.273528-06:00 jdbc[3]: exception
-org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "USERS" not found (this database is empty); SQL statement:
-select u1_0.id,u1_0.created_at,u1_0.email,u1_0.password_hash,u1_0.username from users u1_0 where u1_0.username=? [42104-232]
-2025-08-04 18:55:59.692532-06:00 jdbc[3]: exception
-org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "BETS" not found (this database is empty); SQL statement:
-select b1_0.id,b1_0.acceptor_id,b1_0.amount_cents,b1_0.created_at,b1_0.game_id,b1_0.group_id,b1_0.market_type,b1_0.odds,b1_0.pick,b1_0.proposer_id,b1_0.resolved_at,b1_0.status from bets b1_0 [42104-232]
